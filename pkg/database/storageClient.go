@@ -18,6 +18,7 @@ type StorageClient interface {
 	SaveTable(string, Schema) error
 	LoadTables() map[string]TableEntry
 	DropTable(string) error
+	InsertValues(string, []Blob) error
 }
 
 func ResolveClient() StorageClient {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 )
@@ -65,6 +66,20 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 
 	sc.removeFromTableList(tableName)
 	return nil
+}
+
+func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
+	contents, err := ioutil.ReadFile(truePath(target))
+	split := strings.Split(string(contents), "\n")
+	log.Println(string(contents))
+	for _, blob := range blobs {
+		blobStr, _ := json.Marshal(blob)
+		split = append(split, string(blobStr))
+	}
+
+	err = ioutil.WriteFile(truePath(target), []byte(strings.Join(split, "\n")), 0644)
+
+	return err
 }
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema Schema) {

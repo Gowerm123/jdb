@@ -33,3 +33,7 @@ func DropTable(tableName string) error {
 	storageClient.DropTable(tableName)
 	return nil
 }
+
+func InsertValues(target string, blobs []Blob) error {
+	return storageClient.InsertValues(target, blobs)
+}

@@ -105,7 +105,8 @@ func accept() {
 		nextToken()
 		values := values()
 		tagBuffer = append(tagBuffer, Tag{key: "values", value: values})
-		log.Println(values)
+		nextToken()
+		accept()
 		break
 	default:
 		addToTokenBuffer(words[iterPtr])
