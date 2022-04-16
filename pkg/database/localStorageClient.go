@@ -1,0 +1,99 @@
+package database
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
+)
+
+type LocalStorageClient struct{}
+
+func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
+	for _, path := range paths {
+		err := os.WriteFile(path, contents, 644)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
+	for _, path := range paths {
+		file, err := os.OpenFile(path, os.O_APPEND, 0644)
+		if err != nil {
+			return err
+		}
+
+		_, err = file.Write(contents)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (sc *LocalStorageClient) SaveTable(name string, schema Schema) error {
+	if err := sc.write([]byte{}, truePath(name)); err != nil {
+		return err
+	}
+	sc.appendToTableList(name, schema)
+	return nil
+}
+
+func (sc *LocalStorageClient) LoadTables() map[string]TableEntry {
+	contents, _ := ioutil.ReadFile(tableListPath())
+	splitConts := strings.Split(string(contents), "\n")
+
+	endMap := make(map[string]TableEntry)
+
+	for _, entry := range splitConts {
+		var tableEntry TableEntry
+		json.Unmarshal([]byte(entry), &tableEntry)
+		endMap[tableEntry.EntryName] = tableEntry
+	}
+
+	return endMap
+}
+
+func (sc *LocalStorageClient) DropTable(tableName string) error {
+	if err := os.Remove(truePath(tableName)); err != nil {
+		return err
+	}
+
+	sc.removeFromTableList(tableName)
+	return nil
+}
+
+func (sc *LocalStorageClient) appendToTableList(name string, schema Schema) {
+	entry := NewTableEntry(name, truePath(name), schema)
+	tables[name] = entry
+	sc.writeToTableListFile()
+}
+
+func (sc *LocalStorageClient) removeFromTableList(name string) {
+	delete(tables, name)
+	sc.writeToTableListFile()
+}
+
+func (sc *LocalStorageClient) writeToTableListFile() {
+	contents := ""
+	for _, table := range tables {
+		if table.EntryName == "" {
+			continue
+		}
+		str, _ := json.Marshal(table)
+		contents += fmt.Sprintf("%s\n", str)
+	}
+	ioutil.WriteFile(tableListPath(), []byte(contents), 0644)
+}
+
+func truePath(path string) string {
+	return fmt.Sprintf("%s/%s", DIR, path)
+}
+
+func tableListPath() string {
+	return truePath(".tables")
+}
