@@ -62,12 +62,14 @@ func accept() {
 	}
 	switch words[iterPtr] {
 	case jdbSelect:
+		addToTokenBuffer(jdbSelect)
 		nextToken()
 		optional()
 		expect(jdbFrom)
 		break
 	case jdbFrom:
 		nextToken()
+		ident()
 		accept()
 		break
 	case jdbCreate:
@@ -108,6 +110,7 @@ func accept() {
 		nextToken()
 		accept()
 		break
+
 	default:
 		addToTokenBuffer(words[iterPtr])
 		nextToken()
@@ -135,11 +138,13 @@ func reset() {
 }
 
 func optional() {
-	if isKeyword(words[iterPtr]) {
-		return
-	} else {
+	options := ""
+	for !isKeyword(words[iterPtr]) {
+		options += words[iterPtr]
 		nextToken()
 	}
+
+	addToTagBuffer("options", options)
 }
 
 func ident() {
@@ -204,4 +209,11 @@ func contains(ls []string, tr string) bool {
 		}
 	}
 	return false
+}
+
+func addToTagBuffer(key string, value interface{}) {
+	tagBuffer = append(tagBuffer, Tag{
+		key:   key,
+		value: value,
+	})
 }

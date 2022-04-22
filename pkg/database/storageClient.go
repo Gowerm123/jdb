@@ -6,6 +6,11 @@ type TableEntry struct {
 	EntrySchema Schema `json:"schema"`
 }
 
+type Query struct {
+	Target  string
+	Columns string
+}
+
 func NewTableEntry(name, dir string, schema Schema) TableEntry {
 	return TableEntry{
 		EntryName:   name,
@@ -19,6 +24,7 @@ type StorageClient interface {
 	LoadTables() map[string]TableEntry
 	DropTable(string) error
 	InsertValues(string, []Blob) error
+	SelectValues(Query) error
 }
 
 func ResolveClient() StorageClient {

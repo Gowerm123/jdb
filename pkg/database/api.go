@@ -37,3 +37,7 @@ func DropTable(tableName string) error {
 func InsertValues(target string, blobs []Blob) error {
 	return storageClient.InsertValues(target, blobs)
 }
+
+func SelectValues(query Query) error {
+	return storageClient.SelectValues(query)
+}

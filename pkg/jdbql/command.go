@@ -44,6 +44,11 @@ func (cmd *Command) execute(inst Instruction) error {
 		err = database.DropTable(inst.target)
 	case jdbInsert:
 		err = database.InsertValues(inst.target, inst.tags["values"].([]database.Blob))
+	case jdbSelect:
+		err = database.SelectValues(database.Query{
+			Target:  inst.target,
+			Columns: inst.tags["options"].(string),
+		})
 	}
 
 	return err
