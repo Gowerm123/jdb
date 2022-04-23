@@ -11,5 +11,7 @@ func main() {
 
 	mux.Post("/jdb", http.HandlerFunc(jdbHandler))
 
+	mux.Get("/ui", http.HandlerFunc(UIHandler))
+
 	http.ListenAndServe(":8142", mux)
 }

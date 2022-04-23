@@ -1,6 +1,9 @@
 package jdbql
 
 import (
+	"encoding/json"
+	"net/http"
+
 	"github.com/gowerm123/jdb/pkg/database"
 )
 
@@ -15,6 +18,35 @@ type Tag struct {
 	value interface{}
 }
 
+type CommandContext struct {
+	req *http.Request
+	rw  http.ResponseWriter
+	cmd Command
+}
+
+func CreateContext(req *http.Request, rw http.ResponseWriter, cmd Command) CommandContext {
+	cc := CommandContext{}
+
+	cc.req = req
+	cc.rw = rw
+	cc.cmd = cmd
+
+	return cc
+}
+
+func (cc *CommandContext) Execute() error {
+	for _, instruction := range cc.cmd {
+		if blobs, err := cc.cmd.execute(instruction); err != nil {
+			return err
+		} else {
+			bytes, _ := json.Marshal(blobs)
+			cc.rw.Write(bytes)
+			cc.rw.WriteHeader(200)
+		}
+	}
+	return nil
+}
+
 type Command []Instruction
 
 func (cmd *Command) addInstructionFromStr(operation, target string) {
@@ -25,17 +57,9 @@ func (cmd *Command) addInstruction(inst Instruction) {
 	*cmd = append(*cmd, inst)
 }
 
-func (cmd *Command) Execute() error {
-	for _, instruction := range *cmd {
-		if err := cmd.execute(instruction); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (cmd *Command) execute(inst Instruction) error {
+func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 	var err error
+	var blobs []database.Blob
 	switch inst.operation {
 	case jdbCreate:
 		err = database.CreateTable(inst.target, inst.tags["schema"].(database.Schema))
@@ -45,13 +69,23 @@ func (cmd *Command) execute(inst Instruction) error {
 	case jdbInsert:
 		err = database.InsertValues(inst.target, inst.tags["values"].([]database.Blob))
 	case jdbSelect:
-		err = database.SelectValues(database.Query{
-			Target:  inst.target,
-			Columns: inst.tags["options"].(string),
-		})
+		predicate, ok := inst.tags["predicate"]
+		if !ok {
+			blobs, err = database.SelectValues(database.Query{
+				Target:  inst.target,
+				Columns: inst.tags["options"].(string),
+			})
+		} else {
+			blobs, err = database.SelectValues(database.Query{
+				Target:     inst.target,
+				Columns:    inst.tags["options"].(string),
+				Predicates: []database.Predicate{predicate.(database.Predicate)},
+			})
+		}
+
 	}
 
-	return err
+	return blobs, err
 }
 
 func (inst *Instruction) addTag(tag Tag) {

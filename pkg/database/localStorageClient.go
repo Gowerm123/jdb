@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 )
@@ -13,7 +12,7 @@ type LocalStorageClient struct{}
 
 func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
 	for _, path := range paths {
-		err := os.WriteFile(path, contents, 644)
+		err := os.WriteFile(path, contents, 0644)
 		if err != nil {
 			return err
 		}
@@ -75,7 +74,6 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
 	contents, err := ioutil.ReadFile(truePath(target))
 	split := strings.Split(string(contents), "\n")
-	log.Println(string(contents))
 	for _, blob := range blobs {
 		blobStr, _ := json.Marshal(blob)
 		split = append(split, string(blobStr))
@@ -86,12 +84,9 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
 	return err
 }
 
-func (sc *LocalStorageClient) SelectValues(query Query) error {
+func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
 	blobs := sc.collectBlobs(query)
-	for _, blob := range blobs {
-		log.Println(blob)
-	}
-	return nil
+	return blobs, nil
 }
 
 func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
@@ -120,7 +115,40 @@ func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
 
 		blobs = append(blobs, endBlob)
 	}
+
+	if len(query.Predicates) > 0 {
+		blobs = sc.applyPredicates(query.Target, query.Predicates, blobs)
+	}
 	return blobs
+}
+
+func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predicate, blobs []Blob) []Blob {
+	schema := tables[target].EntrySchema
+	var keeps []bool = make([]bool, len(blobs))
+	for _, predicate := range predicates {
+		for ind, blob := range blobs {
+			keeps[ind] = check(predicate, blob, schema, predicate.comparator)
+		}
+	}
+
+	var newBlobs []Blob
+
+	for ind := range blobs {
+		if keeps[ind] {
+			newBlobs = append(newBlobs, blobs[ind])
+		}
+	}
+
+	return newBlobs
+}
+
+func check(predicate Predicate, blob Blob, schema Schema, comparator string) bool {
+	if _, ok := blob[predicate.field]; !ok {
+		return false
+	}
+
+	targetType := schema[predicate.field]
+	return compare(blob[predicate.field], predicate.target, targetType, comparator)
 }
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema Schema) {

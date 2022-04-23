@@ -4,30 +4,26 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"net/http"
 	"strings"
 
 	"github.com/gowerm123/jdb/pkg/database"
 )
 
 const (
-	jdbSelect  = "SELECT"
-	jdbCreate  = "CREATE"
-	jdbDrop    = "DROP"
-	jdbInsert  = "INSERT"
-	jdbInto    = "INTO"
-	jdbValues  = "VALUES"
-	jdbDelete  = "DELETE"
-	jdbFrom    = "FROM"
-	jdbTable   = "TABLE"
-	jdbInt     = "INT"
-	jdbString  = "STRING"
-	jdbBoolean = "BOOLEAN"
-	jdbIdent   = "ident"
-	jdbAs      = "AS"
+	jdbSelect = "SELECT"
+	jdbCreate = "CREATE"
+	jdbDrop   = "DROP"
+	jdbInsert = "INSERT"
+	jdbInto   = "INTO"
+	jdbValues = "VALUES"
+	jdbDelete = "DELETE"
+	jdbFrom   = "FROM"
+	jdbTable  = "TABLE"
+	jdbWhere  = "WHERE"
+	jdbIdent  = "ident"
+	jdbAs     = "AS"
 )
-
-var keyWords []string = []string{jdbSelect, jdbCreate, jdbDrop, jdbInsert, jdbDelete, jdbFrom, jdbTable, jdbInt, jdbString, jdbBoolean, jdbAs, jdbInto, jdbValues}
 
 var (
 	words       []string
@@ -37,7 +33,18 @@ var (
 	_cmd        Command
 	tokenBuffer []string
 	tagBuffer   []Tag
+
+	activeRequest *http.Request
+	activeWriter  http.ResponseWriter
+
+	keyWords    []string = []string{jdbSelect, jdbCreate, jdbDrop, jdbInsert, jdbDelete, jdbFrom, jdbTable, jdbAs, jdbInto, jdbValues}
+	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
+
+func AssignParserActives(req *http.Request, rw http.ResponseWriter) {
+	activeRequest = req
+	activeWriter = rw
+}
 
 func Parse(command string) {
 	reset()
@@ -49,12 +56,12 @@ func Parse(command string) {
 
 func accept() {
 	if iterPtr == len(words) {
-		log.Println("Done")
 		if len(tokenBuffer) > 0 {
 			_cmd.addInstruction(parseFromTokenBuffer())
 		}
-		log.Println(_cmd)
-		err := _cmd.Execute()
+
+		context := CreateContext(activeRequest, activeWriter, _cmd)
+		err := context.Execute()
 		if err != nil {
 			panic(err)
 		}
@@ -110,7 +117,10 @@ func accept() {
 		nextToken()
 		accept()
 		break
-
+	case jdbWhere:
+		nextToken()
+		predicate()
+		break
 	default:
 		addToTokenBuffer(words[iterPtr])
 		nextToken()
@@ -176,6 +186,29 @@ func values() []database.Blob {
 	}
 
 	return blobs
+}
+
+func predicate() {
+	field := words[iterPtr]
+	nextToken()
+	comparator := words[iterPtr]
+	nextToken()
+	target := words[iterPtr]
+	if target[0] == '\'' {
+		target = target[1:]
+		iterPtr++
+		for words[iterPtr][len(words[iterPtr])-1] != '\'' {
+			target += " " + words[iterPtr]
+		}
+
+		target += " " + words[iterPtr][:len(words[iterPtr])-1]
+	}
+
+	_predicate := database.BuildPredicate(field, comparator, target)
+	addToTagBuffer("predicate", _predicate)
+
+	nextToken()
+	accept()
 }
 
 func addToTokenBuffer(str string) {
