@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type Predicate struct {
@@ -34,11 +35,17 @@ func GetTables() map[string]TableEntry {
 	return tables
 }
 
-func CreateTable(tableName string, schema Schema) error {
+func CreateTable(tableName string, schema Schema, partitionColumns interface{}) error {
+	partColumns := []string{}
+
+	if partitionColumns != nil {
+		partColumns = strings.Split(partitionColumns.(string), ",")
+	}
+
 	if _, ok := tables[tableName]; ok {
 		return errors.New(fmt.Sprintf("table %s already exists", tableName))
 	}
-	storageClient.SaveTable(tableName, schema)
+	storageClient.SaveTable(tableName, schema, partColumns)
 	return nil
 }
 
@@ -51,6 +58,17 @@ func DropTable(tableName string) error {
 }
 
 func InsertValues(target string, blobs []Blob) error {
+	tableEntry, ok := tables[target]
+	if !ok {
+		return errors.New(fmt.Sprintf("table %s does not exist", target))
+	}
+
+	for _, blob := range blobs {
+		if !tableEntry.EntrySchema.Validate(blob) {
+			return errors.New(fmt.Sprintf("failed to validate schema for %v", blob))
+		}
+	}
+
 	return storageClient.InsertValues(target, blobs)
 }
 

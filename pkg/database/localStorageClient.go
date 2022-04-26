@@ -39,11 +39,12 @@ func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) SaveTable(name string, schema Schema) error {
+func (sc *LocalStorageClient) SaveTable(name string, schema Schema, partitionColumns []string) error {
 	if err := sc.write([]byte{}, truePath(name)); err != nil {
 		return err
 	}
-	sc.appendToTableList(name, schema)
+
+	sc.appendToTableList(name, schema, partitionColumns)
 	return nil
 }
 
@@ -92,7 +93,6 @@ func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
 func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
 	filePath := truePath(query.Target)
 	contents, _ := sc.read(filePath)
-	columns := strings.Split(query.Columns, ",")
 
 	blobs := []Blob{}
 
@@ -103,7 +103,7 @@ func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
 		var blob Blob
 		var endBlob Blob = make(Blob)
 		json.Unmarshal([]byte(line), &blob)
-		for _, field := range columns {
+		for _, field := range query.Columns {
 			if field == "*" {
 				for field2 := range blob {
 					endBlob[field2] = blob[field2]
@@ -151,8 +151,8 @@ func check(predicate Predicate, blob Blob, schema Schema, comparator string) boo
 	return compare(blob[predicate.field], predicate.target, targetType, comparator)
 }
 
-func (sc *LocalStorageClient) appendToTableList(name string, schema Schema) {
-	entry := NewTableEntry(name, truePath(name), schema)
+func (sc *LocalStorageClient) appendToTableList(name string, schema Schema, partitionColumns []string) {
+	entry := NewTableEntry(name, truePath(name), schema, partitionColumns)
 	tables[name] = entry
 	sc.writeToTableListFile()
 }

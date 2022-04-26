@@ -11,18 +11,20 @@ import (
 )
 
 const (
-	jdbSelect = "SELECT"
-	jdbCreate = "CREATE"
-	jdbDrop   = "DROP"
-	jdbInsert = "INSERT"
-	jdbInto   = "INTO"
-	jdbValues = "VALUES"
-	jdbDelete = "DELETE"
-	jdbFrom   = "FROM"
-	jdbTable  = "TABLE"
-	jdbWhere  = "WHERE"
-	jdbIdent  = "ident"
-	jdbAs     = "AS"
+	jdbSelect      = "SELECT"
+	jdbCreate      = "CREATE"
+	jdbDrop        = "DROP"
+	jdbInsert      = "INSERT"
+	jdbInto        = "INTO"
+	jdbValues      = "VALUES"
+	jdbDelete      = "DELETE"
+	jdbFrom        = "FROM"
+	jdbTable       = "TABLE"
+	jdbWhere       = "WHERE"
+	jdbIdent       = "ident"
+	jdbAs          = "AS"
+	jdbPartitioned = "PARTITIONED"
+	jdbOn          = "ON"
 )
 
 var (
@@ -33,6 +35,8 @@ var (
 	_cmd        Command
 	tokenBuffer []string
 	tagBuffer   []Tag
+	prevToken   string
+	currToken   string
 
 	activeRequest *http.Request
 	activeWriter  http.ResponseWriter
@@ -55,7 +59,7 @@ func Parse(command string) {
 }
 
 func accept() {
-	if iterPtr == len(words) {
+	if truePtr >= len(rawContents) {
 		if len(tokenBuffer) > 0 {
 			_cmd.addInstruction(parseFromTokenBuffer())
 		}
@@ -67,78 +71,95 @@ func accept() {
 		}
 		return
 	}
-	switch words[iterPtr] {
+
+	switch currToken {
 	case jdbSelect:
 		addToTokenBuffer(jdbSelect)
-		nextToken()
-		optional()
+		nextToken(false)
+		optional("select-columns")
 		expect(jdbFrom)
 		break
 	case jdbFrom:
-		nextToken()
+		nextToken(false)
 		ident()
 		accept()
 		break
 	case jdbCreate:
 		addToTokenBuffer(jdbCreate)
-		nextToken()
+		nextToken(false)
 		expect(jdbTable)
 		break
 	case jdbTable:
-		nextToken()
+		nextToken(false)
 		ident()
 		accept()
 		break
 	case jdbAs:
-		nextToken()
 		schema := schema()
+		nextToken(false)
 		tagBuffer = append(tagBuffer, Tag{key: "schema", value: schema})
 		accept()
 		break
 	case jdbDrop:
 		addToTokenBuffer(jdbDrop)
-		nextToken()
+		nextToken(false)
 		expect(jdbTable)
 		break
 	case jdbInsert:
 		addToTokenBuffer(jdbInsert)
-		nextToken()
+		nextToken(false)
 		expect(jdbInto)
 		break
 	case jdbInto:
-		nextToken()
+		nextToken(false)
 		ident()
 		expect(jdbValues)
 		break
 	case jdbValues:
-		nextToken()
 		values := values()
 		tagBuffer = append(tagBuffer, Tag{key: "values", value: values})
-		nextToken()
+		nextToken(false)
 		accept()
 		break
 	case jdbWhere:
-		nextToken()
+		nextToken(false)
 		predicate()
 		break
+	case jdbPartitioned:
+		nextToken(false)
+		expect(jdbOn)
+		switch prevToken {
+		case jdbPartitioned:
+			optional("partition-columns")
+			break
+		}
+		break
 	default:
-		addToTokenBuffer(words[iterPtr])
-		nextToken()
+		addToTokenBuffer(currToken)
+		nextToken(true)
 		accept()
 		break
 	}
 }
 
 func expect(command string) {
-	if words[iterPtr] != command {
-		fatal("unexpected token", words[iterPtr], "expected", command)
+	if currToken != command {
+		fatal("unexpected token", currToken, "expected", command)
 	}
 	accept()
 }
 
-func nextToken() {
-	truePtr += len(words[iterPtr]) + 1
-	iterPtr++
+func nextToken(isIdent bool) {
+	buff := ""
+	for truePtr < len(rawContents) && rawContents[truePtr] != ' ' {
+		buff += string(rawContents[truePtr])
+		truePtr++
+	}
+	truePtr++
+	if !isIdent {
+		prevToken = currToken
+	}
+	currToken = buff
 }
 
 func reset() {
@@ -147,19 +168,34 @@ func reset() {
 	_cmd = Command{}
 }
 
-func optional() {
-	options := ""
-	for !isKeyword(words[iterPtr]) {
-		options += words[iterPtr]
-		nextToken()
+func optional(name string) {
+	options := []string{currToken}
+	tmpPtr := truePtr
+	for true {
+		token := ""
+		for tmpPtr < len(rawContents) && rawContents[tmpPtr] != ',' && rawContents[tmpPtr] != ' ' {
+			token += string(rawContents[tmpPtr])
+			tmpPtr++
+		}
+
+		if isKeyword(token) {
+			break
+		}
+
+		options = append(options, token)
+		if rawContents[tmpPtr] == ' ' {
+			tmpPtr++
+			break
+		}
 	}
 
-	addToTagBuffer("options", options)
+	addToTagBuffer(name, options)
+	nextToken(false)
 }
 
 func ident() {
-	addToTokenBuffer(words[iterPtr])
-	nextToken()
+	addToTokenBuffer(currToken)
+	nextToken(true)
 }
 
 func isKeyword(cmd string) bool {
@@ -167,14 +203,49 @@ func isKeyword(cmd string) bool {
 }
 
 func schema() database.Schema {
-	subStr := rawContents[truePtr:]
+	lbrPointer := 1
+	tempPtr := truePtr + 1
+	for tempPtr < len(rawContents) && lbrPointer > 0 {
+		if rawContents[tempPtr] == '{' {
+			lbrPointer++
+		} else if rawContents[tempPtr] == '}' {
+			lbrPointer--
+		}
+		tempPtr++
+	}
+	subStr := rawContents[truePtr:tempPtr]
+
 	var schema database.Schema
-	json.Unmarshal([]byte(subStr), &schema)
+	if err := json.Unmarshal([]byte(subStr), &schema); err != nil {
+		panic(err)
+	}
 
 	return schema
 }
 
 func values() []database.Blob {
+	tempPtr := truePtr + 1
+	lPtr := tempPtr
+	for rawContents[lPtr] != '{' {
+		lPtr--
+	}
+
+	tmpPtr := truePtr + 1
+	brackCtr := 1
+	for tmpPtr < len(rawContents) {
+		if brackCtr == 0 && rawContents[tmpPtr] == ' ' {
+			truePtr = tmpPtr + 1
+			break
+		}
+		if rawContents[tmpPtr] == '{' {
+			brackCtr++
+		} else if rawContents[tmpPtr] == '}' {
+			brackCtr--
+		}
+
+		tmpPtr++
+	}
+
 	blobs := []database.Blob{}
 
 	subStr := rawContents[truePtr:]
@@ -189,25 +260,25 @@ func values() []database.Blob {
 }
 
 func predicate() {
-	field := words[iterPtr]
-	nextToken()
-	comparator := words[iterPtr]
-	nextToken()
-	target := words[iterPtr]
+	field := currToken
+	nextToken(false)
+	comparator := currToken
+	nextToken(false)
+	target := currToken
 	if target[0] == '\'' {
 		target = target[1:]
 		iterPtr++
-		for words[iterPtr][len(words[iterPtr])-1] != '\'' {
-			target += " " + words[iterPtr]
+		for currToken[len(currToken)-1] != '\'' {
+			target += " " + currToken
 		}
 
-		target += " " + words[iterPtr][:len(words[iterPtr])-1]
+		target += " " + currToken[:len(currToken)-1]
 	}
 
 	_predicate := database.BuildPredicate(field, comparator, target)
 	addToTagBuffer("predicate", _predicate)
 
-	nextToken()
+	nextToken(false)
 	accept()
 }
 
@@ -217,8 +288,8 @@ func addToTokenBuffer(str string) {
 
 func parseFromTokenBuffer() Instruction {
 	inst := Instruction{
-		operation: tokenBuffer[0],
-		target:    tokenBuffer[1],
+		operation: tokenBuffer[1],
+		target:    tokenBuffer[2],
 	}
 
 	for _, tag := range tagBuffer {

@@ -42,7 +42,6 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 	var bleh string
 
 	tables := database.GetTables()
-
 	for _, table := range tables {
 		if table.EntryName == "" {
 			continue
@@ -56,8 +55,9 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 		}
 
 		response, _ := ioutil.ReadAll(resp.Body)
-
 		bleh += fmt.Sprintf("TABLE - %s<br>", table.EntryName)
+		jsonSchema, _ := json.Marshal(table.EntrySchema)
+		bleh += fmt.Sprintf("SCHEMA - %s<br>", jsonSchema)
 		bleh += fmt.Sprintf("RECORDS<br>")
 
 		var blobs []database.Blob

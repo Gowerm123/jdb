@@ -4,8 +4,8 @@ var (
 	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
 
-func compare(value, predicateTarget interface{}, targetType string, comparator string) bool {
-	switch targetType {
+func compare(value, predicateTarget, targetType interface{}, comparator string) bool {
+	switch targetType.(string) {
 	case "int":
 		return compareInts(value.(int), predicateTarget.(int), comparator)
 	case "bool":

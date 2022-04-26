@@ -62,7 +62,7 @@ func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 	var blobs []database.Blob
 	switch inst.operation {
 	case jdbCreate:
-		err = database.CreateTable(inst.target, inst.tags["schema"].(database.Schema))
+		err = database.CreateTable(inst.target, inst.tags["schema"].(database.Schema), inst.tags["partition-columns"])
 		break
 	case jdbDrop:
 		err = database.DropTable(inst.target)
@@ -73,12 +73,12 @@ func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 		if !ok {
 			blobs, err = database.SelectValues(database.Query{
 				Target:  inst.target,
-				Columns: inst.tags["options"].(string),
+				Columns: inst.tags["select-columns"].([]string),
 			})
 		} else {
 			blobs, err = database.SelectValues(database.Query{
 				Target:     inst.target,
-				Columns:    inst.tags["options"].(string),
+				Columns:    inst.tags["select-columns"].([]string),
 				Predicates: []database.Predicate{predicate.(database.Predicate)},
 			})
 		}

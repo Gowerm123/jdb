@@ -1,5 +1,64 @@
 package database
 
-type Schema map[string]string
+type Schema map[string]interface{}
 
 type Blob map[string]interface{}
+
+const (
+	jsonString = "string"
+	jsonInt    = "int"
+	jsonFloat  = "float"
+	jsonBool   = "boolean"
+)
+
+func (sch *Schema) Validate(blob Blob) bool {
+	for fieldName, fieldType := range *sch {
+		if object, ok := blob[fieldName]; !ok || (!sch.checkType(fieldName, object, fieldType)) {
+			return false
+		}
+	}
+
+	return len(blob) == len(*sch)
+}
+
+func (sch *Schema) checkType(fieldName string, object, fieldType interface{}) bool {
+	if _, ok := fieldType.(string); !ok {
+		fieldMap := object.(map[string]interface{})
+		fieldSchema := (*sch)[fieldName].(map[string]interface{})
+		for field, value := range fieldMap {
+			if !sch.checkType(field, value, fieldSchema[field]) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	switch fieldType.(string) {
+	case jsonBool:
+		if _, ok := object.(bool); !ok {
+			return false
+		}
+		break
+	case jsonString:
+		if _, ok := object.(string); !ok {
+			return false
+		}
+		break
+	case jsonInt:
+		if _, ok := object.(int); !ok {
+			//ints can deserialize as float64
+			if _, ok := object.(float64); !ok {
+				return false
+			}
+		}
+		break
+	case jsonFloat:
+		if _, ok := object.(float64); !ok {
+			return false
+		}
+		break
+	}
+
+	return true
+}
