@@ -1,10 +1,10 @@
 package database
 
 type TableEntry struct {
-	EntryName        string   `json:"name"`
-	EntryDir         string   `json:"directory"`
-	EntrySchema      Schema   `json:"schema"`
-	PartitionColumns []string `json:"partitionColumns"`
+	EntryName        string            `json:"name"`
+	EntrySchema      Schema            `json:"schema"`
+	PartitionColumns []string          `json:"partitionColumns"`
+	Metadata         map[string]string `json:"metadata"`
 }
 
 type Query struct {
@@ -13,23 +13,31 @@ type Query struct {
 	Predicates []Predicate
 }
 
-func NewTableEntry(name, dir string, schema Schema, partitionColumns []string) TableEntry {
+func NewTableEntry(name string, schema Schema, partitionColumns []string, metadata map[string]string) TableEntry {
 	return TableEntry{
 		EntryName:        name,
-		EntryDir:         dir,
 		EntrySchema:      schema,
 		PartitionColumns: partitionColumns,
+		Metadata:         metadata,
 	}
 }
 
 type StorageClient interface {
 	SaveTable(string, Schema, []string) error
-	LoadTables() map[string]TableEntry
+	LoadTables()
 	DropTable(string) error
 	InsertValues(string, []Blob) error
 	SelectValues(Query) ([]Blob, error)
+	GetTables() map[string]TableEntry
 }
 
-func ResolveClient() StorageClient {
-	return &LocalStorageClient{}
+func ResolveClient(isTestEnvironment bool) StorageClient {
+	if isTestEnvironment {
+		return &testStorageClient{
+			tables: make(map[string]TableEntry),
+			blobs:  make(map[string][]Blob),
+		}
+	} else {
+		return &LocalStorageClient{}
+	}
 }

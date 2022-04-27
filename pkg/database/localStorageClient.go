@@ -2,13 +2,18 @@ package database
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/gowerm123/jdb/pkg/configs"
 )
 
-type LocalStorageClient struct{}
+type LocalStorageClient struct {
+	tables map[string]TableEntry
+}
 
 func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
 	for _, path := range paths {
@@ -40,6 +45,10 @@ func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
 }
 
 func (sc *LocalStorageClient) SaveTable(name string, schema Schema, partitionColumns []string) error {
+	if _, ok := sc.tables[name]; ok {
+		return errors.New(fmt.Sprintf("table %s already exists", name))
+	}
+
 	if err := sc.write([]byte{}, truePath(name)); err != nil {
 		return err
 	}
@@ -48,7 +57,7 @@ func (sc *LocalStorageClient) SaveTable(name string, schema Schema, partitionCol
 	return nil
 }
 
-func (sc *LocalStorageClient) LoadTables() map[string]TableEntry {
+func (sc *LocalStorageClient) LoadTables() {
 	contents, _ := ioutil.ReadFile(tableListPath())
 	splitConts := strings.Split(string(contents), "\n")
 
@@ -60,10 +69,14 @@ func (sc *LocalStorageClient) LoadTables() map[string]TableEntry {
 		endMap[tableEntry.EntryName] = tableEntry
 	}
 
-	return endMap
+	sc.tables = endMap
 }
 
 func (sc *LocalStorageClient) DropTable(tableName string) error {
+	if _, ok := sc.tables[tableName]; !ok {
+		return errors.New(fmt.Sprintf("table %s does not exist", tableName))
+	}
+
 	if err := os.Remove(truePath(tableName)); err != nil {
 		return err
 	}
@@ -73,6 +86,17 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 }
 
 func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
+	tableEntry, ok := sc.tables[target]
+	if !ok {
+		return errors.New(fmt.Sprintf("table %s does not exist", target))
+	}
+
+	for _, blob := range blobs {
+		if !tableEntry.EntrySchema.Validate(blob) {
+			return errors.New(fmt.Sprintf("failed to validate schema for %v", blob))
+		}
+	}
+
 	contents, err := ioutil.ReadFile(truePath(target))
 	split := strings.Split(string(contents), "\n")
 	for _, blob := range blobs {
@@ -90,8 +114,12 @@ func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
 	return blobs, nil
 }
 
+func (sc *LocalStorageClient) GetTables() map[string]TableEntry {
+	return sc.tables
+}
+
 func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
-	filePath := truePath(query.Target)
+	filePath := sc.tables[query.Target].Metadata["dir"]
 	contents, _ := sc.read(filePath)
 
 	blobs := []Blob{}
@@ -123,7 +151,7 @@ func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
 }
 
 func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predicate, blobs []Blob) []Blob {
-	schema := tables[target].EntrySchema
+	schema := sc.tables[target].EntrySchema
 	var keeps []bool = make([]bool, len(blobs))
 	for _, predicate := range predicates {
 		for ind, blob := range blobs {
@@ -152,19 +180,21 @@ func check(predicate Predicate, blob Blob, schema Schema, comparator string) boo
 }
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema Schema, partitionColumns []string) {
-	entry := NewTableEntry(name, truePath(name), schema, partitionColumns)
-	tables[name] = entry
+	metadata := make(map[string]string)
+	metadata["dir"] = truePath(name)
+	entry := NewTableEntry(name, schema, partitionColumns, metadata)
+	sc.tables[name] = entry
 	sc.writeToTableListFile()
 }
 
 func (sc *LocalStorageClient) removeFromTableList(name string) {
-	delete(tables, name)
+	delete(sc.tables, name)
 	sc.writeToTableListFile()
 }
 
 func (sc *LocalStorageClient) writeToTableListFile() {
 	contents := ""
-	for _, table := range tables {
+	for _, table := range sc.tables {
 		if table.EntryName == "" {
 			continue
 		}
@@ -175,7 +205,8 @@ func (sc *LocalStorageClient) writeToTableListFile() {
 }
 
 func truePath(path string) string {
-	return fmt.Sprintf("%s/%s", DIR, path)
+	basePath := configs.GetConfigs().BaseDirectory
+	return fmt.Sprintf("%s/%s", basePath, path)
 }
 
 func tableListPath() string {

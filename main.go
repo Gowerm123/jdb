@@ -4,9 +4,12 @@ import (
 	"net/http"
 
 	"github.com/go-zoo/bone"
+	"github.com/gowerm123/jdb/pkg/database"
 )
 
 func main() {
+	database.InitClient(false)
+
 	mux := bone.New()
 
 	mux.Post("/jdb", http.HandlerFunc(jdbHandler))

@@ -41,7 +41,7 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 
 	var bleh string
 
-	tables := database.GetTables()
+	tables := database.ListTables()
 	for _, table := range tables {
 		if table.EntryName == "" {
 			continue
