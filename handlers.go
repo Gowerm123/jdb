@@ -57,7 +57,7 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 		response, _ := ioutil.ReadAll(resp.Body)
 		bleh += fmt.Sprintf("TABLE - %s<br>", table.EntryName)
 		jsonSchema, _ := json.Marshal(table.EntrySchema)
-		bleh += fmt.Sprintf("SCHEMA - %s<br>", jsonSchema)
+		bleh += fmt.Sprintf("SCHEMA - <code>%s</code><br>", jsonSchema)
 		bleh += fmt.Sprintf("RECORDS<br>")
 
 		var blobs []database.Blob
@@ -65,7 +65,7 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 
 		for _, blob := range blobs {
 			str, _ := json.Marshal(blob)
-			bleh += string(str) + "<br>"
+			bleh += "<code>" + string(str) + "</code><br>"
 		}
 
 		bleh += "<br><br>"

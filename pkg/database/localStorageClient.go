@@ -215,7 +215,7 @@ func (sc *LocalStorageClient) writeToTableListFile() {
 }
 
 func truePath(path string) string {
-	basePath := configs.GetConfigs().BaseDirectory
+	basePath := configs.GetConfig(configs.BaseDirectoryPath)
 	return fmt.Sprintf("%s/%s", basePath, path)
 }
 
