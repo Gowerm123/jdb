@@ -128,9 +128,13 @@ func accept() {
 	case jdbPartitioned:
 		nextToken(false)
 		expect(jdbOn)
+		break
+	case jdbOn:
 		switch prevToken {
 		case jdbPartitioned:
+			nextToken(false)
 			optional("partition-columns")
+			accept()
 			break
 		}
 		break
@@ -183,6 +187,7 @@ func reset() {
 func optional(name string) {
 	options := []string{currToken}
 	tmpPtr := truePtr
+
 	for true {
 		token := ""
 		for tmpPtr < len(rawContents) && rawContents[tmpPtr] != ',' && rawContents[tmpPtr] != ' ' {
@@ -193,9 +198,10 @@ func optional(name string) {
 		if isKeyword(token) {
 			break
 		}
-
-		options = append(options, token)
-		if rawContents[tmpPtr] == ' ' {
+		if token != "" {
+			options = append(options, token)
+		}
+		if tmpPtr >= len(rawContents) || rawContents[tmpPtr] == ' ' {
 			tmpPtr++
 			break
 		}

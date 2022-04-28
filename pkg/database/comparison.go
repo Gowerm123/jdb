@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -11,13 +10,13 @@ var (
 )
 
 func compare(value, predicateTarget, targetType interface{}, comparator string) bool {
-	log.Println(targetType)
 	switch targetType.(string) {
 	case "int":
 		val1, val2 := tryParseInt(value), tryParseInt(predicateTarget)
 		return compareInts(val1, val2, comparator)
 	case "bool":
-		return compareBools(value.(bool), predicateTarget.(bool), comparator)
+		val1, val2 := tryParseBool(value), tryParseBool(value)
+		return compareBools(val1, val2, comparator)
 	case "string":
 		return compareStrings(value.(string), predicateTarget.(string), comparator)
 	case "float":
@@ -132,4 +131,10 @@ func tryParseFloat(value interface{}) float64 {
 	}
 
 	return val
+}
+
+func tryParseBool(value interface{}) bool {
+	str := fmt.Sprint(value)
+
+	return str == "true"
 }
