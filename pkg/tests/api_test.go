@@ -2,8 +2,6 @@ package tests
 
 import (
 	"encoding/json"
-	"log"
-	"reflect"
 	"testing"
 
 	"github.com/gowerm123/jdb/pkg/database"
@@ -30,8 +28,17 @@ func insertTestValue() {
 
 	json.Unmarshal([]byte(value), &blob)
 
-	log.Println(reflect.TypeOf(database.GetClient()))
 	database.InsertValues(tableName, []database.Blob{blob})
+}
+
+func insertInvalidTestValue() error {
+	tableName := "testTable"
+	value := `{"bad":"hello world!","column":200}`
+	var blob database.Blob
+
+	json.Unmarshal([]byte(value), &blob)
+
+	return database.InsertValues(tableName, []database.Blob{blob})
 }
 
 func selectAllFromTestTable() []database.Blob {
@@ -62,5 +69,14 @@ func Test_InsertValuesAddsRecordToTable(t *testing.T) {
 
 	if len(blobs) != 1 {
 		t.Fatal("incorrect number of table entries")
+	}
+}
+
+func Test_InsertInvalidSchemaThrowsError(t *testing.T) {
+	createTestTable()
+	err := insertInvalidTestValue()
+
+	if err == nil {
+		t.Fatal("insert invalid schema did not throw an error")
 	}
 }

@@ -60,7 +60,6 @@ func (sc *LocalStorageClient) SaveTable(name string, schema Schema, partitionCol
 func (sc *LocalStorageClient) LoadTables() {
 	contents, _ := ioutil.ReadFile(tableListPath())
 	splitConts := strings.Split(string(contents), "\n")
-
 	endMap := make(map[string]TableEntry)
 
 	for _, entry := range splitConts {
@@ -171,12 +170,23 @@ func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predic
 }
 
 func check(predicate Predicate, blob Blob, schema Schema, comparator string) bool {
-	if _, ok := blob[predicate.field]; !ok {
-		return false
-	}
+	var target, targetType interface{}
+	getField(predicate.field, blob, &target)
+	getField(predicate.field, schema, &targetType)
+	return compare(target, predicate.target, targetType, comparator)
+}
 
-	targetType := schema[predicate.field]
-	return compare(blob[predicate.field], predicate.target, targetType, comparator)
+func getField(field string, blob map[string]interface{}, target *interface{}) {
+	spl := strings.Split(field, ".")
+
+	var currMap map[string]interface{} = blob
+	for ind, field := range spl {
+		if ind != len(spl)-1 {
+			currMap = currMap[field].(map[string]interface{})
+		} else {
+			*target = currMap[field]
+		}
+	}
 }
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema Schema, partitionColumns []string) {

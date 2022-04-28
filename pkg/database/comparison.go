@@ -1,19 +1,28 @@
 package database
 
+import (
+	"fmt"
+	"log"
+	"strconv"
+)
+
 var (
 	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
 
 func compare(value, predicateTarget, targetType interface{}, comparator string) bool {
+	log.Println(targetType)
 	switch targetType.(string) {
 	case "int":
-		return compareInts(value.(int), predicateTarget.(int), comparator)
+		val1, val2 := tryParseInt(value), tryParseInt(predicateTarget)
+		return compareInts(val1, val2, comparator)
 	case "bool":
 		return compareBools(value.(bool), predicateTarget.(bool), comparator)
 	case "string":
 		return compareStrings(value.(string), predicateTarget.(string), comparator)
 	case "float":
-		return compareFloats(value.(float64), predicateTarget.(float64), comparator)
+		val1, val2 := tryParseFloat(value), tryParseFloat(predicateTarget)
+		return compareFloats(val1, val2, comparator)
 	case "char":
 		return compareChars(value.(byte), predicateTarget.(byte), comparator)
 	}
@@ -101,4 +110,26 @@ func compareChars(value, otherValue byte, comparator string) bool {
 		return value >= otherValue
 	}
 	return false
+}
+
+func tryParseInt(value interface{}) int {
+	str := fmt.Sprint(value)
+
+	val, err := strconv.Atoi(str)
+	if err != nil {
+		panic(err)
+	}
+
+	return val
+}
+
+func tryParseFloat(value interface{}) float64 {
+	str := fmt.Sprint(value)
+
+	val, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	return val
 }

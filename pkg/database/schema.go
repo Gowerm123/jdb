@@ -11,9 +11,20 @@ const (
 	jsonBool   = "boolean"
 )
 
-func (sch *Schema) Validate(blob Blob) bool {
+func (sch *Schema) Validate(blobs ...Blob) bool {
+	for _, blob := range blobs {
+		if !sch.validate(blob) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (sch *Schema) validate(blob Blob) bool {
 	for fieldName, fieldType := range *sch {
 		if object, ok := blob[fieldName]; !ok || (!sch.checkType(fieldName, object, fieldType)) {
+
 			return false
 		}
 	}

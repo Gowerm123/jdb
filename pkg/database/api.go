@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"strings"
 )
 
@@ -41,6 +42,10 @@ func DropTable(tableName string) error {
 }
 
 func InsertValues(target string, blobs []Blob) error {
+	schema := storageClient.GetTables()[target].EntrySchema
+	if !schema.Validate(blobs...) {
+		return errors.New("failed to validate schema")
+	}
 	return storageClient.InsertValues(target, blobs)
 }
 

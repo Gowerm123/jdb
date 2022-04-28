@@ -4,10 +4,13 @@ import (
 	"net/http"
 
 	"github.com/go-zoo/bone"
+	"github.com/gowerm123/jdb/pkg/configs"
 	"github.com/gowerm123/jdb/pkg/database"
 )
 
 func main() {
+	configs.Load()
+
 	database.InitClient(false)
 
 	mux := bone.New()

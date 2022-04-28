@@ -151,14 +151,26 @@ func expect(command string) {
 
 func nextToken(isIdent bool) {
 	buff := ""
-	for truePtr < len(rawContents) && rawContents[truePtr] != ' ' {
-		buff += string(rawContents[truePtr])
+	if truePtr >= len(rawContents) {
+		return
+	}
+	if rawContents[truePtr] == '\'' {
+		truePtr++
+		for truePtr < len(rawContents) && rawContents[truePtr] != '\'' {
+			buff += string(rawContents[truePtr])
+			truePtr++
+		}
+	} else {
+		for truePtr < len(rawContents) && (rawContents[truePtr] != ' ') {
+			buff += string(rawContents[truePtr])
+			truePtr++
+		}
 		truePtr++
 	}
-	truePtr++
 	if !isIdent {
 		prevToken = currToken
 	}
+
 	currToken = buff
 }
 
@@ -265,6 +277,7 @@ func predicate() {
 	comparator := currToken
 	nextToken(false)
 	target := currToken
+
 	if target[0] == '\'' {
 		target = target[1:]
 		iterPtr++
