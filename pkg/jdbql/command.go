@@ -9,7 +9,7 @@ import (
 
 type Instruction struct {
 	operation string
-	target    string
+	targets   []string
 	tags      map[string]interface{}
 }
 
@@ -49,8 +49,8 @@ func (cc *CommandContext) Execute() error {
 
 type Command []Instruction
 
-func (cmd *Command) addInstructionFromStr(operation, target string) {
-	*cmd = append(*cmd, Instruction{operation: operation, target: target})
+func (cmd *Command) addInstructionFromStr(operation string, targets []string) {
+	*cmd = append(*cmd, Instruction{operation: operation, targets: targets})
 }
 
 func (cmd *Command) addInstruction(inst Instruction) {
@@ -62,22 +62,22 @@ func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 	var blobs []database.Blob
 	switch inst.operation {
 	case jdbCreate:
-		err = database.CreateTable(inst.target, inst.tags["schema"].(database.Schema), inst.tags["partition-columns"])
+		err = database.CreateTable(inst.targets[0], inst.tags["schema"].(database.Schema), inst.tags["partition-columns"])
 		break
 	case jdbDrop:
-		err = database.DropTable(inst.target)
+		err = database.DropTable(inst.targets[0])
 	case jdbInsert:
-		err = database.InsertValues(inst.target, inst.tags["values"].([]database.Blob))
+		err = database.InsertValues(inst.targets[0], inst.tags["values"].([]database.Blob))
 	case jdbSelect:
 		predicate, ok := inst.tags["predicate"]
 		if !ok {
 			blobs, err = database.SelectValues(database.Query{
-				Target:  inst.target,
+				Targets: inst.targets,
 				Columns: inst.tags["select-columns"].([]string),
 			})
 		} else {
 			blobs, err = database.SelectValues(database.Query{
-				Target:     inst.target,
+				Targets:    inst.targets,
 				Columns:    inst.tags["select-columns"].([]string),
 				Predicates: []database.Predicate{predicate.(database.Predicate)},
 			})
@@ -91,6 +91,9 @@ func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 func (inst *Instruction) addTag(tag Tag) {
 	if inst.tags == nil {
 		inst.tags = make(map[string]interface{})
+	}
+	if tag.key == "targets" {
+		inst.targets = tag.value.([]string)
 	}
 	inst.tags[tag.key] = tag.value
 }

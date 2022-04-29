@@ -24,6 +24,7 @@ const (
 	jdbIdent       = "ident"
 	jdbAs          = "AS"
 	jdbPartitioned = "PARTITIONED"
+	jdbJoin        = "JOIN"
 	jdbOn          = "ON"
 )
 
@@ -60,7 +61,7 @@ func Parse(command string) {
 
 func accept() {
 	if truePtr >= len(rawContents) {
-		if len(tokenBuffer) > 0 {
+		if len(tokenBuffer) > 0 || len(tagBuffer) > 0 {
 			_cmd.addInstruction(parseFromTokenBuffer())
 		}
 
@@ -136,7 +137,16 @@ func accept() {
 			optional("partition-columns")
 			accept()
 			break
+		case jdbJoin:
+			assignment("join-columns")
+			accept()
+			break
 		}
+
+	case jdbJoin:
+		nextToken(false)
+		ident()
+		expect(jdbOn)
 		break
 	default:
 		addToTokenBuffer(currToken)
@@ -182,6 +192,10 @@ func reset() {
 	iterPtr = 0
 	truePtr = 0
 	_cmd = Command{}
+	tokenBuffer = []string{}
+	tagBuffer = []Tag{}
+	currToken = ""
+	prevToken = ""
 }
 
 func optional(name string) {
@@ -212,7 +226,13 @@ func optional(name string) {
 }
 
 func ident() {
-	addToTokenBuffer(currToken)
+	var val []string = []string{}
+	for _, tag := range tagBuffer {
+		if tag.key == "targets" {
+			val = tag.value.([]string)
+		}
+	}
+	addToTagBuffer("targets", append(val, currToken))
 	nextToken(true)
 }
 
@@ -277,6 +297,48 @@ func values() []database.Blob {
 	return blobs
 }
 
+func assignment(name string) {
+	tmpPtr := truePtr
+	buff := ""
+	tempBuff := [][]string{}
+	for true {
+		firstTerm, secondTerm := "", ""
+
+		for tmpPtr < len(rawContents) && (rawContents[tmpPtr] != ' ' || rawContents[tmpPtr] == '=') {
+			buff += string(rawContents[tmpPtr])
+			tmpPtr++
+		}
+		firstTerm = buff
+		buff = ""
+
+		if rawContents[tmpPtr] == ' ' {
+			tmpPtr++
+		}
+		tmpPtr += 2
+		for tmpPtr < len(rawContents) && (rawContents[tmpPtr] != ' ' || rawContents[tmpPtr] == ',') {
+			buff += string(rawContents[tmpPtr])
+			tmpPtr++
+		}
+		secondTerm = buff
+
+		key, value := strings.ReplaceAll(firstTerm, " ", ""), strings.ReplaceAll(secondTerm, " ", "")
+
+		tmp := []string{key, value}
+		tempBuff = append(tempBuff, tmp)
+
+		truePtr = tmpPtr
+
+		if tmpPtr >= len(rawContents) || rawContents[tmpPtr] == ' ' {
+			break
+		} else {
+			truePtr += 2
+		}
+
+	}
+
+	addToTagBuffer(name, tempBuff)
+}
+
 func predicate() {
 	field := currToken
 	nextToken(false)
@@ -308,7 +370,6 @@ func addToTokenBuffer(str string) {
 func parseFromTokenBuffer() Instruction {
 	inst := Instruction{
 		operation: tokenBuffer[1],
-		target:    tokenBuffer[2],
 	}
 
 	for _, tag := range tagBuffer {

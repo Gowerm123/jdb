@@ -109,16 +109,22 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
 }
 
 func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
-	blobs := sc.collectBlobs(query)
-	return blobs, nil
+	var blobBuff []Blob
+
+	for _, target := range query.Targets {
+		blobs := sc.collectBlobs(target, query.Columns, query.Predicates)
+
+		blobBuff = append(blobBuff, blobs...)
+	}
+	return blobBuff, nil
 }
 
 func (sc *LocalStorageClient) GetTables() map[string]TableEntry {
 	return sc.tables
 }
 
-func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
-	filePath := sc.tables[query.Target].Metadata["dir"]
+func (sc *LocalStorageClient) collectBlobs(target string, columns []string, predicates []Predicate) []Blob {
+	filePath := sc.tables[target].Metadata["dir"]
 	contents, _ := sc.read(filePath)
 
 	blobs := []Blob{}
@@ -130,21 +136,24 @@ func (sc *LocalStorageClient) collectBlobs(query Query) []Blob {
 		var blob Blob
 		var endBlob Blob = make(Blob)
 		json.Unmarshal([]byte(line), &blob)
-		for _, field := range query.Columns {
+		for _, field := range columns {
 			if field == "*" {
 				for field2 := range blob {
 					endBlob[field2] = blob[field2]
 				}
 				break
+			} else {
+				var value interface{}
+				getField(field, blob, &value)
+				endBlob[field] = value
 			}
-			endBlob[field] = blob[field]
 		}
 
 		blobs = append(blobs, endBlob)
 	}
 
-	if len(query.Predicates) > 0 {
-		blobs = sc.applyPredicates(query.Target, query.Predicates, blobs)
+	if len(predicates) > 0 {
+		blobs = sc.applyPredicates(target, predicates, blobs)
 	}
 	return blobs
 }
@@ -173,6 +182,7 @@ func check(predicate Predicate, blob Blob, schema Schema, comparator string) boo
 	var target, targetType interface{}
 	getField(predicate.field, blob, &target)
 	getField(predicate.field, schema, &targetType)
+
 	return compare(target, predicate.target, targetType, comparator)
 }
 

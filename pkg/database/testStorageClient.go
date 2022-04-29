@@ -47,7 +47,7 @@ func (sc *testStorageClient) SaveTable(name string, schema Schema, partitionColu
 }
 
 func (sc *testStorageClient) SelectValues(query Query) ([]Blob, error) {
-	return sc.blobs[query.Target], nil
+	return sc.blobs[query.Targets[0]], nil
 }
 
 func (sc *testStorageClient) GetTables() map[string]TableEntry {

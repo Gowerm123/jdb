@@ -15,7 +15,8 @@ import (
 func jdbHandler(rw http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("Fatal -", r)
+			rw.Write([]byte(fmt.Sprint(r)))
+			rw.WriteHeader(500)
 		}
 	}()
 

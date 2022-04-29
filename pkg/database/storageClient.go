@@ -8,9 +8,10 @@ type TableEntry struct {
 }
 
 type Query struct {
-	Target     string
-	Columns    []string
-	Predicates []Predicate
+	Targets     []string
+	Columns     []string
+	Predicates  []Predicate
+	JoinColumns [][]string
 }
 
 func NewTableEntry(name string, schema Schema, partitionColumns []string, metadata map[string]string) TableEntry {
