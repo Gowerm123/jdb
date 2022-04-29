@@ -26,6 +26,7 @@ const (
 	jdbPartitioned = "PARTITIONED"
 	jdbJoin        = "JOIN"
 	jdbOn          = "ON"
+	jdbList        = "LIST"
 )
 
 var (
@@ -147,6 +148,12 @@ func accept() {
 		nextToken(false)
 		ident()
 		expect(jdbOn)
+		break
+	case jdbList:
+		addToTokenBuffer(jdbList)
+		nextToken(false)
+		ident()
+		accept()
 		break
 	default:
 		addToTokenBuffer(currToken)

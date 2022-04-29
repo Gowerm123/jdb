@@ -2,6 +2,7 @@ package jdbql
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/gowerm123/jdb/pkg/database"
@@ -58,6 +59,7 @@ func (cmd *Command) addInstruction(inst Instruction) {
 }
 
 func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
+	log.Println(inst)
 	var err error
 	var blobs []database.Blob
 	switch inst.operation {
@@ -82,10 +84,24 @@ func (cmd *Command) execute(inst Instruction) ([]database.Blob, error) {
 				Predicates: []database.Predicate{predicate.(database.Predicate)},
 			})
 		}
-
+	case jdbList:
+		target := inst.targets[0]
+		if target == "TABLES" {
+			return toBlobList(database.ListTables()), nil
+		}
 	}
 
 	return blobs, err
+}
+
+func toBlobList(tables map[string]database.TableEntry) (blobs []database.Blob) {
+	for key, _ := range tables {
+		if key == "" {
+			continue
+		}
+		blobs = append(blobs, database.Blob{"tableName": key})
+	}
+	return blobs
 }
 
 func (inst *Instruction) addTag(tag Tag) {
