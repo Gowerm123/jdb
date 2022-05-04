@@ -1,4 +1,4 @@
-package database
+package shared
 
 type Schema map[string]interface{}
 

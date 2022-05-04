@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gowerm123/jdb/pkg/database"
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 const (
@@ -24,9 +26,10 @@ const (
 	jdbIdent       = "ident"
 	jdbAs          = "AS"
 	jdbPartitioned = "PARTITIONED"
-	jdbJoin        = "JOIN"
 	jdbOn          = "ON"
 	jdbList        = "LIST"
+	jdbGroup       = "GROUP"
+	jdbBy          = "BY"
 )
 
 var (
@@ -77,13 +80,13 @@ func accept() {
 	switch currToken {
 	case jdbSelect:
 		addToTokenBuffer(jdbSelect)
-		nextToken(false)
 		optional("select-columns")
+		nextToken(false)
 		expect(jdbFrom)
 		break
 	case jdbFrom:
+		optional("targets")
 		nextToken(false)
-		ident()
 		accept()
 		break
 	case jdbCreate:
@@ -134,25 +137,22 @@ func accept() {
 	case jdbOn:
 		switch prevToken {
 		case jdbPartitioned:
-			nextToken(false)
 			optional("partition-columns")
 			accept()
 			break
-		case jdbJoin:
-			assignment("join-columns")
-			accept()
-			break
 		}
-
-	case jdbJoin:
-		nextToken(false)
-		ident()
-		expect(jdbOn)
-		break
 	case jdbList:
 		addToTokenBuffer(jdbList)
 		nextToken(false)
 		ident()
+		accept()
+		break
+	case jdbGroup:
+		nextToken(false)
+		expect(jdbBy)
+		break
+	case jdbBy:
+		optional("group-by-columns")
 		accept()
 		break
 	default:
@@ -206,9 +206,8 @@ func reset() {
 }
 
 func optional(name string) {
-	options := []string{currToken}
+	options := []string{}
 	tmpPtr := truePtr
-
 	for true {
 		token := ""
 		for tmpPtr < len(rawContents) && rawContents[tmpPtr] != ',' && rawContents[tmpPtr] != ' ' {
@@ -226,10 +225,11 @@ func optional(name string) {
 			tmpPtr++
 			break
 		}
-	}
 
+	}
 	addToTagBuffer(name, options)
-	nextToken(false)
+	truePtr = tmpPtr
+	log.Println(options)
 }
 
 func ident() {
@@ -247,7 +247,7 @@ func isKeyword(cmd string) bool {
 	return contains(keyWords, cmd)
 }
 
-func schema() database.Schema {
+func schema() shared.Schema {
 	lbrPointer := 1
 	tempPtr := truePtr + 1
 	for tempPtr < len(rawContents) && lbrPointer > 0 {
@@ -260,7 +260,7 @@ func schema() database.Schema {
 	}
 	subStr := rawContents[truePtr:tempPtr]
 
-	var schema database.Schema
+	var schema shared.Schema
 	if err := json.Unmarshal([]byte(subStr), &schema); err != nil {
 		panic(err)
 	}
@@ -268,7 +268,7 @@ func schema() database.Schema {
 	return schema
 }
 
-func values() []database.Blob {
+func values() []shared.Blob {
 	tempPtr := truePtr + 1
 	lPtr := tempPtr
 	for rawContents[lPtr] != '{' {
@@ -291,12 +291,12 @@ func values() []database.Blob {
 		tmpPtr++
 	}
 
-	blobs := []database.Blob{}
+	blobs := []shared.Blob{}
 
 	subStr := rawContents[truePtr:]
 	split := strings.Split(subStr, "@@")
 	for _, blobStr := range split {
-		var blob database.Blob
+		var blob shared.Blob
 		json.Unmarshal([]byte(blobStr), &blob)
 		blobs = append(blobs, blob)
 	}

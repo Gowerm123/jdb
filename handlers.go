@@ -10,6 +10,7 @@ import (
 
 	"github.com/gowerm123/jdb/pkg/database"
 	"github.com/gowerm123/jdb/pkg/jdbql"
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 func jdbHandler(rw http.ResponseWriter, req *http.Request) {
@@ -61,7 +62,7 @@ func UIHandler(rw http.ResponseWriter, req *http.Request) {
 		bleh += fmt.Sprintf("SCHEMA - <code>%s</code><br>", jsonSchema)
 		bleh += fmt.Sprintf("RECORDS<br>")
 
-		var blobs []database.Blob
+		var blobs []shared.Blob
 		json.Unmarshal(response, &blobs)
 
 		for _, blob := range blobs {

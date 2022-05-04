@@ -1,14 +1,18 @@
 package database
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/gowerm123/jdb/pkg/configs"
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 type LocalStorageClient struct {
@@ -44,7 +48,7 @@ func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) SaveTable(name string, schema Schema, partitionColumns []string) error {
+func (sc *LocalStorageClient) SaveTable(name string, schema shared.Schema, partitionColumns []string) error {
 	if _, ok := sc.tables[name]; ok {
 		return errors.New(fmt.Sprintf("table %s already exists", name))
 	}
@@ -84,7 +88,7 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
+func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) error {
 	tableEntry, ok := sc.tables[target]
 	if !ok {
 		return errors.New(fmt.Sprintf("table %s does not exist", target))
@@ -108,10 +112,11 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []Blob) error {
 	return err
 }
 
-func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
-	var blobBuff []Blob
+func (sc *LocalStorageClient) SelectValues(query Query) ([]shared.Blob, error) {
+	var blobBuff []shared.Blob
 
 	for _, target := range query.Targets {
+		target = strings.ReplaceAll(target, ",", "")
 		blobs := sc.collectBlobs(target, query.Columns, query.Predicates)
 
 		blobBuff = append(blobBuff, blobs...)
@@ -119,22 +124,53 @@ func (sc *LocalStorageClient) SelectValues(query Query) ([]Blob, error) {
 	return blobBuff, nil
 }
 
+func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, columns []string) []shared.Blob {
+	buckets := make(map[string][]shared.Blob)
+	for _, blob := range l {
+		hash := sc.hash(blob, columns[0])
+
+		tempBucket, ok := buckets[hash]
+		if !ok {
+			tempBucket = []shared.Blob{}
+		}
+		buckets[hash] = append(tempBucket, blob)
+	}
+
+	for _, blob := range r {
+		hash := sc.hash(blob, columns[1])
+		tempBucket, ok := buckets[hash]
+		if !ok {
+			tempBucket = []shared.Blob{}
+		}
+		buckets[hash] = append(tempBucket, blob)
+	}
+
+	var finalBlobs []shared.Blob
+	for _, blob := range r {
+		hash := sc.hash(blob, columns[0])
+		tempBucket, _ := buckets[hash]
+		finalBlobs = append(finalBlobs, tempBucket...)
+	}
+
+	return finalBlobs
+}
+
 func (sc *LocalStorageClient) GetTables() map[string]TableEntry {
 	return sc.tables
 }
 
-func (sc *LocalStorageClient) collectBlobs(target string, columns []string, predicates []Predicate) []Blob {
+func (sc *LocalStorageClient) collectBlobs(target string, columns []string, predicates []Predicate) []shared.Blob {
 	filePath := sc.tables[target].Metadata["dir"]
 	contents, _ := sc.read(filePath)
 
-	blobs := []Blob{}
+	blobs := []shared.Blob{}
 
 	for _, line := range strings.Split(string(contents), "\n") {
 		if line == "" {
 			continue
 		}
-		var blob Blob
-		var endBlob Blob = make(Blob)
+		var blob shared.Blob
+		var endBlob shared.Blob = make(shared.Blob)
 		json.Unmarshal([]byte(line), &blob)
 		for _, field := range columns {
 			if field == "*" {
@@ -158,16 +194,17 @@ func (sc *LocalStorageClient) collectBlobs(target string, columns []string, pred
 	return blobs
 }
 
-func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predicate, blobs []Blob) []Blob {
+func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predicate, blobs []shared.Blob) []shared.Blob {
 	schema := sc.tables[target].EntrySchema
 	var keeps []bool = make([]bool, len(blobs))
 	for _, predicate := range predicates {
 		for ind, blob := range blobs {
+			log.Println(predicate, blob, schema, predicate.comparator)
 			keeps[ind] = check(predicate, blob, schema, predicate.comparator)
 		}
 	}
 
-	var newBlobs []Blob
+	var newBlobs []shared.Blob
 
 	for ind := range blobs {
 		if keeps[ind] {
@@ -178,7 +215,7 @@ func (sc *LocalStorageClient) applyPredicates(target string, predicates []Predic
 	return newBlobs
 }
 
-func check(predicate Predicate, blob Blob, schema Schema, comparator string) bool {
+func check(predicate Predicate, blob shared.Blob, schema shared.Schema, comparator string) bool {
 	var target, targetType interface{}
 	getField(predicate.field, blob, &target)
 	getField(predicate.field, schema, &targetType)
@@ -199,7 +236,7 @@ func getField(field string, blob map[string]interface{}, target *interface{}) {
 	}
 }
 
-func (sc *LocalStorageClient) appendToTableList(name string, schema Schema, partitionColumns []string) {
+func (sc *LocalStorageClient) appendToTableList(name string, schema shared.Schema, partitionColumns []string) {
 	metadata := make(map[string]string)
 	metadata["dir"] = truePath(name)
 	entry := NewTableEntry(name, schema, partitionColumns, metadata)
@@ -222,6 +259,17 @@ func (sc *LocalStorageClient) writeToTableListFile() {
 		contents += fmt.Sprintf("%s\n", str)
 	}
 	ioutil.WriteFile(tableListPath(), []byte(contents), 0644)
+}
+
+func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
+	var value interface{}
+	getField(column, input, &value)
+	str := fmt.Sprint(value)
+
+	hasher := sha1.New()
+	hasher.Write([]byte(str))
+
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
 func truePath(path string) string {

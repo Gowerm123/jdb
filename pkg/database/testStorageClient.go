@@ -2,11 +2,13 @@ package database
 
 import (
 	"fmt"
+
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 type testStorageClient struct {
 	tables map[string]TableEntry
-	blobs  map[string][]Blob
+	blobs  map[string][]shared.Blob
 }
 
 type TableNotFoundError struct {
@@ -28,7 +30,7 @@ func (sc *testStorageClient) DropTable(str string) error {
 	return nil
 }
 
-func (sc *testStorageClient) InsertValues(target string, values []Blob) error {
+func (sc *testStorageClient) InsertValues(target string, values []shared.Blob) error {
 	if _, ok := sc.tables[target]; !ok {
 		return ErrTableNotFound(target)
 	}
@@ -41,12 +43,12 @@ func (sc *testStorageClient) LoadTables() {
 	sc.tables = make(map[string]TableEntry)
 }
 
-func (sc *testStorageClient) SaveTable(name string, schema Schema, partitionColumns []string) error {
+func (sc *testStorageClient) SaveTable(name string, schema shared.Schema, partitionColumns []string) error {
 	sc.tables[name] = NewTableEntry(name, schema, partitionColumns, nil)
 	return nil
 }
 
-func (sc *testStorageClient) SelectValues(query Query) ([]Blob, error) {
+func (sc *testStorageClient) SelectValues(query Query) ([]shared.Blob, error) {
 	return sc.blobs[query.Targets[0]], nil
 }
 

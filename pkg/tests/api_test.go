@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gowerm123/jdb/pkg/database"
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 func init() {
@@ -13,7 +14,7 @@ func init() {
 
 func createTestTable() {
 	tableName := "testTable"
-	tableSchema := database.Schema{
+	tableSchema := shared.Schema{
 		"col1": "string",
 		"col2": "int",
 	}
@@ -24,24 +25,24 @@ func createTestTable() {
 func insertTestValue() {
 	tableName := "testTable"
 	value := `{"col1":"hello world!","col2":200}`
-	var blob database.Blob
+	var blob shared.Blob
 
 	json.Unmarshal([]byte(value), &blob)
 
-	database.InsertValues(tableName, []database.Blob{blob})
+	database.InsertValues(tableName, []shared.Blob{blob})
 }
 
 func insertInvalidTestValue() error {
 	tableName := "testTable"
 	value := `{"bad":"hello world!","column":200}`
-	var blob database.Blob
+	var blob shared.Blob
 
 	json.Unmarshal([]byte(value), &blob)
 
-	return database.InsertValues(tableName, []database.Blob{blob})
+	return database.InsertValues(tableName, []shared.Blob{blob})
 }
 
-func selectAllFromTestTable() []database.Blob {
+func selectAllFromTestTable() []shared.Blob {
 	blobs, _ := database.SelectValues(database.Query{
 		Targets:    []string{"testTable"},
 		Columns:    []string{"*"},

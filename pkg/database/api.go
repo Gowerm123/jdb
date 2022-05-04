@@ -2,7 +2,10 @@ package database
 
 import (
 	"errors"
+	"log"
 	"strings"
+
+	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 type Predicate struct {
@@ -26,7 +29,7 @@ func InitClient(isTestEnvironment bool) {
 	storageClient.LoadTables()
 }
 
-func CreateTable(tableName string, schema Schema, partitionColumns interface{}) error {
+func CreateTable(tableName string, schema shared.Schema, partitionColumns interface{}) error {
 	partColumns := []string{}
 
 	if partitionColumns != nil {
@@ -41,7 +44,7 @@ func DropTable(tableName string) error {
 	return storageClient.DropTable(tableName)
 }
 
-func InsertValues(target string, blobs []Blob) error {
+func InsertValues(target string, blobs []shared.Blob) error {
 	schema := storageClient.GetTables()[target].EntrySchema
 	if !schema.Validate(blobs...) {
 		return errors.New("failed to validate schema")
@@ -49,7 +52,8 @@ func InsertValues(target string, blobs []Blob) error {
 	return storageClient.InsertValues(target, blobs)
 }
 
-func SelectValues(query Query) ([]Blob, error) {
+func SelectValues(query Query) ([]shared.Blob, error) {
+	log.Println(query)
 	return storageClient.SelectValues(query)
 }
 
