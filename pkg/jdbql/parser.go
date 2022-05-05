@@ -8,28 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gowerm123/jdb/pkg/database"
 	"github.com/gowerm123/jdb/pkg/shared"
-)
-
-const (
-	jdbSelect      = "SELECT"
-	jdbCreate      = "CREATE"
-	jdbDrop        = "DROP"
-	jdbInsert      = "INSERT"
-	jdbInto        = "INTO"
-	jdbValues      = "VALUES"
-	jdbDelete      = "DELETE"
-	jdbFrom        = "FROM"
-	jdbTable       = "TABLE"
-	jdbWhere       = "WHERE"
-	jdbIdent       = "ident"
-	jdbAs          = "AS"
-	jdbPartitioned = "PARTITIONED"
-	jdbOn          = "ON"
-	jdbList        = "LIST"
-	jdbGroup       = "GROUP"
-	jdbBy          = "BY"
 )
 
 var (
@@ -37,16 +16,27 @@ var (
 	rawContents string
 	truePtr     int
 	iterPtr     int
-	_cmd        Command
+	_cmd        shared.Command
 	tokenBuffer []string
-	tagBuffer   []Tag
+	tagBuffer   []shared.Tag
 	prevToken   string
 	currToken   string
 
 	activeRequest *http.Request
 	activeWriter  http.ResponseWriter
 
-	keyWords    []string = []string{jdbSelect, jdbCreate, jdbDrop, jdbInsert, jdbDelete, jdbFrom, jdbTable, jdbAs, jdbInto, jdbValues}
+	keyWords []string = []string{
+		shared.JdbSelect,
+		shared.JdbCreate,
+		shared.JdbDrop,
+		shared.JdbInsert,
+		shared.JdbDelete,
+		shared.JdbFrom,
+		shared.JdbTable,
+		shared.JdbAs,
+		shared.JdbInto,
+		shared.JdbValues,
+	}
 	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
 
@@ -66,10 +56,10 @@ func Parse(command string) {
 func accept() {
 	if truePtr >= len(rawContents) {
 		if len(tokenBuffer) > 0 || len(tagBuffer) > 0 {
-			_cmd.addInstruction(parseFromTokenBuffer())
+			_cmd.AddInstruction(parseFromTokenBuffer())
 		}
 
-		context := CreateContext(activeRequest, activeWriter, _cmd)
+		context := shared.CreateContext(activeRequest, activeWriter, _cmd)
 		err := context.Execute()
 		if err != nil {
 			panic(err)
@@ -78,80 +68,80 @@ func accept() {
 	}
 
 	switch currToken {
-	case jdbSelect:
-		addToTokenBuffer(jdbSelect)
+	case shared.JdbSelect:
+		addToTokenBuffer(shared.JdbSelect)
 		optional("select-columns")
 		nextToken(false)
-		expect(jdbFrom)
+		expect(shared.JdbFrom)
 		break
-	case jdbFrom:
+	case shared.JdbFrom:
 		optional("targets")
 		nextToken(false)
 		accept()
 		break
-	case jdbCreate:
-		addToTokenBuffer(jdbCreate)
+	case shared.JdbCreate:
+		addToTokenBuffer(shared.JdbCreate)
 		nextToken(false)
-		expect(jdbTable)
+		expect(shared.JdbTable)
 		break
-	case jdbTable:
+	case shared.JdbTable:
 		nextToken(false)
 		ident()
 		accept()
 		break
-	case jdbAs:
+	case shared.JdbAs:
 		schema := schema()
 		nextToken(false)
-		tagBuffer = append(tagBuffer, Tag{key: "schema", value: schema})
+		tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
 		accept()
 		break
-	case jdbDrop:
-		addToTokenBuffer(jdbDrop)
+	case shared.JdbDrop:
+		addToTokenBuffer(shared.JdbDrop)
 		nextToken(false)
-		expect(jdbTable)
+		expect(shared.JdbTable)
 		break
-	case jdbInsert:
-		addToTokenBuffer(jdbInsert)
+	case shared.JdbInsert:
+		addToTokenBuffer(shared.JdbInsert)
 		nextToken(false)
-		expect(jdbInto)
+		expect(shared.JdbInto)
 		break
-	case jdbInto:
+	case shared.JdbInto:
 		nextToken(false)
 		ident()
-		expect(jdbValues)
+		expect(shared.JdbValues)
 		break
-	case jdbValues:
+	case shared.JdbValues:
 		values := values()
-		tagBuffer = append(tagBuffer, Tag{key: "values", value: values})
+		tagBuffer = append(tagBuffer, shared.Tag{Key: "values", Value: values})
 		nextToken(false)
 		accept()
 		break
-	case jdbWhere:
+	case shared.JdbWhere:
 		nextToken(false)
 		predicate()
 		break
-	case jdbPartitioned:
+	case shared.JdbPartitioned:
 		nextToken(false)
-		expect(jdbOn)
+		expect(shared.JdbOn)
 		break
-	case jdbOn:
+	case shared.JdbOn:
 		switch prevToken {
-		case jdbPartitioned:
+		case shared.JdbPartitioned:
 			optional("partition-columns")
 			accept()
 			break
 		}
-	case jdbList:
-		addToTokenBuffer(jdbList)
+	case shared.JdbList:
+		addToTokenBuffer(shared.JdbList)
 		nextToken(false)
 		ident()
 		accept()
 		break
-	case jdbGroup:
+	case shared.JdbGroup:
 		nextToken(false)
-		expect(jdbBy)
+		expect(shared.JdbBy)
 		break
-	case jdbBy:
+	case shared.JdbBy:
 		optional("group-by-columns")
 		accept()
 		break
@@ -198,9 +188,9 @@ func nextToken(isIdent bool) {
 func reset() {
 	iterPtr = 0
 	truePtr = 0
-	_cmd = Command{}
+	_cmd = shared.Command{}
 	tokenBuffer = []string{}
-	tagBuffer = []Tag{}
+	tagBuffer = []shared.Tag{}
 	currToken = ""
 	prevToken = ""
 }
@@ -235,8 +225,8 @@ func optional(name string) {
 func ident() {
 	var val []string = []string{}
 	for _, tag := range tagBuffer {
-		if tag.key == "targets" {
-			val = tag.value.([]string)
+		if tag.Key == "targets" {
+			val = tag.Value.([]string)
 		}
 	}
 	addToTagBuffer("targets", append(val, currToken))
@@ -363,7 +353,7 @@ func predicate() {
 		target += " " + currToken[:len(currToken)-1]
 	}
 
-	_predicate := database.BuildPredicate(field, comparator, target)
+	_predicate := shared.BuildPredicate(field, comparator, target)
 	addToTagBuffer("predicate", _predicate)
 
 	nextToken(false)
@@ -374,15 +364,15 @@ func addToTokenBuffer(str string) {
 	tokenBuffer = append(tokenBuffer, str)
 }
 
-func parseFromTokenBuffer() Instruction {
-	inst := Instruction{
-		operation: tokenBuffer[1],
+func parseFromTokenBuffer() shared.Instruction {
+	inst := shared.Instruction{
+		Operation: tokenBuffer[1],
 	}
 
 	for _, tag := range tagBuffer {
-		inst.addTag(tag)
+		inst.AddTag(tag)
 	}
-	tagBuffer = []Tag{}
+	tagBuffer = []shared.Tag{}
 	tokenBuffer = []string{}
 	return inst
 }
@@ -403,8 +393,8 @@ func contains(ls []string, tr string) bool {
 }
 
 func addToTagBuffer(key string, value interface{}) {
-	tagBuffer = append(tagBuffer, Tag{
-		key:   key,
-		value: value,
+	tagBuffer = append(tagBuffer, shared.Tag{
+		Key:   key,
+		Value: value,
 	})
 }

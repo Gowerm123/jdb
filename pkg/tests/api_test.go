@@ -43,7 +43,7 @@ func insertInvalidTestValue() error {
 }
 
 func selectAllFromTestTable() []shared.Blob {
-	blobs, _ := database.SelectValues(database.Query{
+	blobs, _ := database.SelectValues(shared.Query{
 		Targets:    []string{"testTable"},
 		Columns:    []string{"*"},
 		Predicates: nil,

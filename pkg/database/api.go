@@ -8,20 +8,6 @@ import (
 	"github.com/gowerm123/jdb/pkg/shared"
 )
 
-type Predicate struct {
-	field      string
-	comparator string
-	target     interface{}
-}
-
-func BuildPredicate(field, comparator string, target interface{}) Predicate {
-	return Predicate{
-		field:      field,
-		comparator: comparator,
-		target:     target,
-	}
-}
-
 var storageClient StorageClient
 
 func InitClient(isTestEnvironment bool) {
@@ -52,12 +38,12 @@ func InsertValues(target string, blobs []shared.Blob) error {
 	return storageClient.InsertValues(target, blobs)
 }
 
-func SelectValues(query Query) ([]shared.Blob, error) {
+func SelectValues(query shared.Query) ([]shared.Blob, error) {
 	log.Println(query)
 	return storageClient.SelectValues(query)
 }
 
-func ListTables() map[string]TableEntry {
+func ListTables() map[string]shared.TableEntry {
 	return storageClient.GetTables()
 }
 

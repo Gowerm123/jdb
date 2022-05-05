@@ -7,7 +7,7 @@ import (
 )
 
 type testStorageClient struct {
-	tables map[string]TableEntry
+	tables map[string]shared.TableEntry
 	blobs  map[string][]shared.Blob
 }
 
@@ -40,18 +40,18 @@ func (sc *testStorageClient) InsertValues(target string, values []shared.Blob) e
 }
 
 func (sc *testStorageClient) LoadTables() {
-	sc.tables = make(map[string]TableEntry)
+	sc.tables = make(map[string]shared.TableEntry)
 }
 
 func (sc *testStorageClient) SaveTable(name string, schema shared.Schema, partitionColumns []string) error {
-	sc.tables[name] = NewTableEntry(name, schema, partitionColumns, nil)
+	sc.tables[name] = shared.NewTableEntry(name, schema, partitionColumns, nil)
 	return nil
 }
 
-func (sc *testStorageClient) SelectValues(query Query) ([]shared.Blob, error) {
+func (sc *testStorageClient) SelectValues(query shared.Query) ([]shared.Blob, error) {
 	return sc.blobs[query.Targets[0]], nil
 }
 
-func (sc *testStorageClient) GetTables() map[string]TableEntry {
+func (sc *testStorageClient) GetTables() map[string]shared.TableEntry {
 	return sc.tables
 }

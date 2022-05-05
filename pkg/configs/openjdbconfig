@@ -1,1 +1,2 @@
 openjdb.base.directory=/home/matt/jdb-dev/
+server.worker.count=2
