@@ -1,5 +1,11 @@
 package shared
 
+import (
+	"fmt"
+
+	"github.com/gowerm123/jdb/pkg/configs"
+)
+
 const (
 	JdbSelect      = "SELECT"
 	JdbCreate      = "CREATE"
@@ -19,3 +25,8 @@ const (
 	JdbGroup       = "GROUP"
 	JdbBy          = "BY"
 )
+
+func TruePath(path string) string {
+	basePath := configs.GetConfig(configs.BaseDirectoryPath)
+	return fmt.Sprintf("%s/%s", basePath, path)
+}

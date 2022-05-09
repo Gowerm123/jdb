@@ -55,3 +55,7 @@ func (sc *testStorageClient) SelectValues(query shared.Query) ([]shared.Blob, er
 func (sc *testStorageClient) GetTables() map[string]shared.TableEntry {
 	return sc.tables
 }
+
+func (sc *testStorageClient) ResolveFile(table string) string {
+	return fmt.Sprintf("%s/alpha", shared.TruePath(table))
+}

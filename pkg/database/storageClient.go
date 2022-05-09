@@ -9,6 +9,7 @@ type StorageClient interface {
 	InsertValues(string, []shared.Blob) error
 	SelectValues(shared.Query) ([]shared.Blob, error)
 	GetTables() map[string]shared.TableEntry
+	ResolveFile(string) string
 }
 
 func ResolveClient(isTestEnvironment bool) StorageClient {

@@ -2,7 +2,6 @@ package database
 
 import (
 	"errors"
-	"log"
 	"strings"
 
 	"github.com/gowerm123/jdb/pkg/shared"
@@ -22,8 +21,7 @@ func CreateTable(tableName string, schema shared.Schema, partitionColumns interf
 		partColumns = strings.Split(partitionColumns.(string), ",")
 	}
 
-	storageClient.SaveTable(tableName, schema, partColumns)
-	return nil
+	return storageClient.SaveTable(tableName, schema, partColumns)
 }
 
 func DropTable(tableName string) error {
@@ -39,12 +37,15 @@ func InsertValues(target string, blobs []shared.Blob) error {
 }
 
 func SelectValues(query shared.Query) ([]shared.Blob, error) {
-	log.Println(query)
 	return storageClient.SelectValues(query)
 }
 
 func ListTables() map[string]shared.TableEntry {
 	return storageClient.GetTables()
+}
+
+func ResolveFile(table string) string {
+	return storageClient.ResolveFile(table)
 }
 
 func GetClient() StorageClient {

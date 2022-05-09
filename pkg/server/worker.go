@@ -1,37 +1,61 @@
 package server
 
 import (
+	"log"
+
+	"github.com/gowerm123/jdb/pkg/database"
 	"github.com/gowerm123/jdb/pkg/shared"
 )
 
 var (
-	Channels      []chan shared.Instruction
-	tableMappings map[string]int
+	roundRobinPtr = 0
 
 	quit chan bool
 )
 
 func StartWorkers(n int) {
-	Channels = make([]chan shared.Instruction, n)
-	tableMappings = make(map[string]int)
+	shared.Channels = make([]chan shared.Instruction, n)
+	for i := range shared.Channels {
+		shared.Channels[i] = make(chan shared.Instruction)
+	}
+	shared.TableMappings = make(map[string]int)
 
 	for i := 0; i < n; i++ {
-		go listen(Channels[i])
+		go listen(i)
 	}
 }
 
-func listen(ch chan shared.Instruction) {
+func listen(chId int) {
 	for {
 		select {
 		case <-quit:
 			return
 		default:
-			checkForTasks(ch)
+			checkForTasks(chId)
 		}
 	}
 }
 
-func checkForTasks(ch chan shared.Instruction) {
-	var inst = <-ch
+func checkForTasks(chId int) {
+	log.Println("listening on channelId", chId)
+	var inst = <-shared.Channels[chId]
+	switch inst.Operation {
+	case shared.JdbSelect:
+		consumer := database.NewConsumer(inst.Targets[0])
+		consumer.ConsumeAll()
+		break
+	case shared.JdbCreate:
+		partCols, _ := inst.Tags["partition-columns"]
+		if err := database.CreateTable(inst.Targets[0], inst.Tags["schema"].(shared.Schema), partCols); err != nil {
+			panic(err)
+		}
+		break
+	case shared.JdbDrop:
+		database.DropTable(inst.Targets[0])
+		break
+	case shared.JdbInsert:
+		database.InsertValues(inst.Targets[0], inst.Tags["values"].([]shared.Blob))
+		break
+	}
 
 }

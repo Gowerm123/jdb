@@ -49,7 +49,7 @@ func Parse(command string) {
 	reset()
 	words = strings.Split(command, " ")
 	rawContents = command
-
+	nextToken(false)
 	accept()
 }
 
@@ -66,7 +66,6 @@ func accept() {
 		}
 		return
 	}
-
 	switch currToken {
 	case shared.JdbSelect:
 		addToTokenBuffer(shared.JdbSelect)
@@ -93,6 +92,7 @@ func accept() {
 		schema := schema()
 		nextToken(false)
 		tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
+		log.Println("boop", truePtr, len(rawContents))
 		accept()
 		break
 	case shared.JdbDrop:
@@ -146,9 +146,7 @@ func accept() {
 		accept()
 		break
 	default:
-		addToTokenBuffer(currToken)
-		nextToken(true)
-		accept()
+		fatal("unexpected token", currToken)
 		break
 	}
 }
@@ -249,7 +247,7 @@ func schema() shared.Schema {
 		tempPtr++
 	}
 	subStr := rawContents[truePtr:tempPtr]
-
+	truePtr = tempPtr
 	var schema shared.Schema
 	if err := json.Unmarshal([]byte(subStr), &schema); err != nil {
 		panic(err)
@@ -366,7 +364,7 @@ func addToTokenBuffer(str string) {
 
 func parseFromTokenBuffer() shared.Instruction {
 	inst := shared.Instruction{
-		Operation: tokenBuffer[1],
+		Operation: tokenBuffer[0],
 	}
 
 	for _, tag := range tagBuffer {

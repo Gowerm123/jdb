@@ -6,6 +6,12 @@ import (
 	"net/http"
 )
 
+var (
+	Channels      []chan Instruction
+	TableMappings map[string]int
+	roundRobinPtr int = 0
+)
+
 type Instruction struct {
 	Operation string
 	Targets   []string
@@ -61,10 +67,8 @@ func (cmd *Command) execute(inst Instruction) ([]Blob, error) {
 	var err error
 	var blobs []Blob
 	switch inst.Operation {
-	case JdbCreate:
-		break
-	case JdbDrop:
-	case JdbInsert:
+	case JdbCreate, JdbDrop, JdbInsert, JdbSelect:
+		forward(inst)
 	}
 	return blobs, err
 }
@@ -87,4 +91,13 @@ func toBlobList(tables map[string]TableEntry) (blobs []Blob) {
 		blobs = append(blobs, Blob{"tableName": key})
 	}
 	return blobs
+}
+
+func forward(inst Instruction) {
+	Channels[roundRobinPtr] <- inst
+
+	roundRobinPtr++
+	if roundRobinPtr >= len(Channels) {
+		roundRobinPtr = 0
+	}
 }

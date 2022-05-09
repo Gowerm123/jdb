@@ -10,7 +10,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gowerm123/jdb/pkg/configs"
 	"github.com/gowerm123/jdb/pkg/shared"
 )
 
@@ -20,7 +19,7 @@ type LocalStorageClient struct {
 
 func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
 	for _, path := range paths {
-		err := os.WriteFile(path, contents, 0644)
+		err := os.WriteFile(path, contents, os.ModeAppend)
 		if err != nil {
 			return err
 		}
@@ -52,7 +51,16 @@ func (sc *LocalStorageClient) SaveTable(name string, schema shared.Schema, parti
 		return errors.New(fmt.Sprintf("table %s already exists", name))
 	}
 
-	if err := sc.write([]byte{}, truePath(name)); err != nil {
+	alpha := fmt.Sprintf("%s/alpha", shared.TruePath(name))
+	beta := fmt.Sprintf("%s/beta", shared.TruePath(name))
+
+	os.MkdirAll(shared.TruePath(name), 0644)
+
+	if err := sc.write([]byte{}, alpha); err != nil {
+		return err
+	}
+
+	if err := sc.write([]byte{}, beta); err != nil {
 		return err
 	}
 
@@ -79,7 +87,7 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 		return errors.New(fmt.Sprintf("table %s does not exist", tableName))
 	}
 
-	if err := os.Remove(truePath(tableName)); err != nil {
+	if err := os.Remove(shared.TruePath(tableName)); err != nil {
 		return err
 	}
 
@@ -99,14 +107,13 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) e
 		}
 	}
 
-	contents, err := ioutil.ReadFile(truePath(target))
+	contents, err := ioutil.ReadFile(ResolveFile(target))
 	split := strings.Split(string(contents), "\n")
 	for _, blob := range blobs {
 		blobStr, _ := json.Marshal(blob)
 		split = append(split, string(blobStr))
 	}
-
-	err = ioutil.WriteFile(truePath(target), []byte(strings.Join(split, "\n")), 0644)
+	err = ioutil.WriteFile(ResolveFile(target), []byte(strings.Join(split, "\n")), 0644)
 
 	return err
 }
@@ -237,7 +244,7 @@ func getField(field string, blob map[string]interface{}, target *interface{}) {
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema shared.Schema, partitionColumns []string) {
 	metadata := make(map[string]string)
-	metadata["dir"] = truePath(name)
+	metadata["dir"] = shared.TruePath(name)
 	entry := shared.NewTableEntry(name, schema, partitionColumns, metadata)
 	sc.tables[name] = entry
 	sc.writeToTableListFile()
@@ -271,11 +278,10 @@ func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
-func truePath(path string) string {
-	basePath := configs.GetConfig(configs.BaseDirectoryPath)
-	return fmt.Sprintf("%s/%s", basePath, path)
+func (sc *LocalStorageClient) ResolveFile(table string) string {
+	return fmt.Sprintf("%s/alpha", shared.TruePath(table))
 }
 
 func tableListPath() string {
-	return truePath(".tables")
+	return shared.TruePath(".tables")
 }
