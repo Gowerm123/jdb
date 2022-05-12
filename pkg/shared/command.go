@@ -1,13 +1,13 @@
 package shared
 
 import (
-	"encoding/json"
-	"log"
 	"net/http"
 )
 
 var (
-	Channels      []chan Instruction
+	IdChannel     chan int
+	RespChannels  []chan string
+	CmdChannels   []chan Instruction
 	TableMappings map[string]int
 	roundRobinPtr int = 0
 )
@@ -41,36 +41,19 @@ func CreateContext(req *http.Request, rw http.ResponseWriter, cmd Command) Comma
 
 func (cc *CommandContext) Execute() error {
 	for _, instruction := range cc.cmd {
-		if blobs, err := cc.cmd.execute(instruction); err != nil {
-			return err
-		} else {
-			bytes, _ := json.Marshal(blobs)
-			cc.rw.Write(bytes)
-			cc.rw.WriteHeader(200)
-		}
+		cc.cmd.execute(instruction)
 	}
 	return nil
 }
 
 type Command []Instruction
 
-func (cmd *Command) addInstructionFromStr(operation string, targets []string) {
-	*cmd = append(*cmd, Instruction{Operation: operation, Targets: targets})
-}
-
 func (cmd *Command) AddInstruction(inst Instruction) {
 	*cmd = append(*cmd, inst)
 }
 
-func (cmd *Command) execute(inst Instruction) ([]Blob, error) {
-	log.Println(inst)
-	var err error
-	var blobs []Blob
-	switch inst.Operation {
-	case JdbCreate, JdbDrop, JdbInsert, JdbSelect:
-		forward(inst)
-	}
-	return blobs, err
+func (cmd *Command) execute(inst Instruction) int {
+	return forward(inst)
 }
 
 func (inst *Instruction) AddTag(tag Tag) {
@@ -84,7 +67,7 @@ func (inst *Instruction) AddTag(tag Tag) {
 }
 
 func toBlobList(tables map[string]TableEntry) (blobs []Blob) {
-	for key, _ := range tables {
+	for key := range tables {
 		if key == "" {
 			continue
 		}
@@ -93,11 +76,13 @@ func toBlobList(tables map[string]TableEntry) (blobs []Blob) {
 	return blobs
 }
 
-func forward(inst Instruction) {
-	Channels[roundRobinPtr] <- inst
+func forward(inst Instruction) (chId int) {
+	CmdChannels[roundRobinPtr] <- inst
 
+	chId = roundRobinPtr
 	roundRobinPtr++
-	if roundRobinPtr >= len(Channels) {
+	if roundRobinPtr >= len(CmdChannels) {
 		roundRobinPtr = 0
 	}
+	return chId
 }

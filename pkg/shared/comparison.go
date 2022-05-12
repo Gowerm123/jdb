@@ -1,4 +1,4 @@
-package database
+package shared
 
 import (
 	"fmt"
@@ -9,7 +9,12 @@ var (
 	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
 
-func compare(value, predicateTarget, targetType interface{}, comparator string) bool {
+type PredicatePayload struct {
+	Field, Comparator string
+	Target            interface{}
+}
+
+func Compare(value, predicateTarget, targetType interface{}, comparator string) bool {
 	switch targetType.(string) {
 	case "int":
 		val1, val2 := tryParseInt(value), tryParseInt(predicateTarget)

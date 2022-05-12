@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -58,7 +57,6 @@ func accept() {
 		if len(tokenBuffer) > 0 || len(tagBuffer) > 0 {
 			_cmd.AddInstruction(parseFromTokenBuffer())
 		}
-
 		context := shared.CreateContext(activeRequest, activeWriter, _cmd)
 		err := context.Execute()
 		if err != nil {
@@ -92,7 +90,6 @@ func accept() {
 		schema := schema()
 		nextToken(false)
 		tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
-		log.Println("boop", truePtr, len(rawContents))
 		accept()
 		break
 	case shared.JdbDrop:
@@ -113,7 +110,6 @@ func accept() {
 	case shared.JdbValues:
 		values := values()
 		tagBuffer = append(tagBuffer, shared.Tag{Key: "values", Value: values})
-		nextToken(false)
 		accept()
 		break
 	case shared.JdbWhere:
@@ -179,7 +175,6 @@ func nextToken(isIdent bool) {
 	if !isIdent {
 		prevToken = currToken
 	}
-
 	currToken = buff
 }
 
@@ -217,7 +212,6 @@ func optional(name string) {
 	}
 	addToTagBuffer(name, options)
 	truePtr = tmpPtr
-	log.Println(options)
 }
 
 func ident() {
@@ -257,13 +251,12 @@ func schema() shared.Schema {
 }
 
 func values() []shared.Blob {
-	tempPtr := truePtr + 1
-	lPtr := tempPtr
+	tmpPtr := truePtr + 1
+	lPtr := tmpPtr
 	for rawContents[lPtr] != '{' {
 		lPtr--
 	}
 
-	tmpPtr := truePtr + 1
 	brackCtr := 1
 	for tmpPtr < len(rawContents) {
 		if brackCtr == 0 && rawContents[tmpPtr] == ' ' {
@@ -288,6 +281,8 @@ func values() []shared.Blob {
 		json.Unmarshal([]byte(blobStr), &blob)
 		blobs = append(blobs, blob)
 	}
+
+	truePtr = tmpPtr
 
 	return blobs
 }
@@ -351,7 +346,7 @@ func predicate() {
 		target += " " + currToken[:len(currToken)-1]
 	}
 
-	_predicate := shared.BuildPredicate(field, comparator, target)
+	_predicate := shared.PredicatePayload{Field: field, Comparator: comparator, Target: target}
 	addToTagBuffer("predicate", _predicate)
 
 	nextToken(false)
@@ -372,6 +367,7 @@ func parseFromTokenBuffer() shared.Instruction {
 	}
 	tagBuffer = []shared.Tag{}
 	tokenBuffer = []string{}
+
 	return inst
 }
 

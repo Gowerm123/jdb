@@ -42,15 +42,7 @@ func insertInvalidTestValue() error {
 	return database.InsertValues(tableName, []shared.Blob{blob})
 }
 
-func selectAllFromTestTable() []shared.Blob {
-	blobs, _ := database.SelectValues(shared.Query{
-		Targets:    []string{"testTable"},
-		Columns:    []string{"*"},
-		Predicates: nil,
-	})
-
-	return blobs
-}
+func selectAllFromTestTable() []shared.Blob
 
 func Test_CreateTableCallsStorageClientWithCorrectParams(t *testing.T) {
 	createTestTable()

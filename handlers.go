@@ -14,6 +14,7 @@ import (
 )
 
 func jdbHandler(rw http.ResponseWriter, req *http.Request) {
+
 	defer func() {
 		if r := recover(); r != nil {
 			rw.Write([]byte(fmt.Sprint(r)))
@@ -24,7 +25,10 @@ func jdbHandler(rw http.ResponseWriter, req *http.Request) {
 	body := readRequestBody(req)
 	jdbql.AssignParserActives(req, rw)
 	jdbql.Parse(string(body))
+	chId := <-shared.IdChannel
+	response := <-shared.RespChannels[chId]
 
+	rw.Write([]byte(response))
 	rw.WriteHeader(200)
 }
 

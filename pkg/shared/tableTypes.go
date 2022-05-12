@@ -10,7 +10,7 @@ type TableEntry struct {
 type Query struct {
 	Targets     []string
 	Columns     []string
-	Predicates  []Predicate
+	Predicates  []func(Blob) Blob
 	JoinColumns [][]string
 }
 
@@ -20,23 +20,5 @@ func NewTableEntry(name string, schema Schema, partitionColumns []string, metada
 		EntrySchema:      schema,
 		PartitionColumns: partitionColumns,
 		Metadata:         metadata,
-	}
-}
-
-type Predicate struct {
-	field      string
-	comparator string
-	target     interface{}
-}
-
-func (pr *Predicate) GetFields() (string, string, interface{}) {
-	return pr.field, pr.comparator, pr.target
-}
-
-func BuildPredicate(field, comparator string, target interface{}) Predicate {
-	return Predicate{
-		field:      field,
-		comparator: comparator,
-		target:     target,
 	}
 }

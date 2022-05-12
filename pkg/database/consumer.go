@@ -2,7 +2,7 @@ package database
 
 import (
 	"bufio"
-	"log"
+	"encoding/json"
 	"os"
 
 	"github.com/gowerm123/jdb/pkg/shared"
@@ -11,6 +11,7 @@ import (
 type Consumer struct {
 	target string
 	udfs   []func(shared.Blob) shared.Blob
+	buffer []shared.Blob
 }
 
 func NewConsumer(target string, udfs ...func(shared.Blob) shared.Blob) Consumer {
@@ -21,7 +22,6 @@ func NewConsumer(target string, udfs ...func(shared.Blob) shared.Blob) Consumer 
 }
 
 func (cons *Consumer) ConsumeAll() []shared.Blob {
-
 	filePath := ResolveFile(cons.target)
 
 	file, err := os.Open(filePath)
@@ -33,9 +33,34 @@ func (cons *Consumer) ConsumeAll() []shared.Blob {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line == "" {
+			continue
+		}
 
-		log.Println(line)
+		var blob shared.Blob
+		json.Unmarshal([]byte(line), &blob)
+
+		for _, udf := range cons.udfs {
+			if udf == nil {
+				continue
+			}
+			blob = udf(blob)
+			if blob == nil {
+				break
+			}
+		}
+		if blob != nil {
+			cons.buffer = append(cons.buffer, blob)
+		}
 	}
 
 	return nil
+}
+
+func (cons *Consumer) ReadAll() []shared.Blob {
+	blobs := cons.buffer
+
+	cons.buffer = []shared.Blob{}
+
+	return blobs
 }

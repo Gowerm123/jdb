@@ -74,6 +74,9 @@ func (sc *LocalStorageClient) LoadTables() {
 	endMap := make(map[string]shared.TableEntry)
 
 	for _, entry := range splitConts {
+		if entry == "" {
+			continue
+		}
 		var tableEntry shared.TableEntry
 		json.Unmarshal([]byte(entry), &tableEntry)
 		endMap[tableEntry.EntryName] = tableEntry
@@ -120,13 +123,6 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) e
 
 func (sc *LocalStorageClient) SelectValues(query shared.Query) ([]shared.Blob, error) {
 	var blobBuff []shared.Blob
-
-	for _, target := range query.Targets {
-		target = strings.ReplaceAll(target, ",", "")
-		blobs := sc.collectBlobs(target, query.Columns, query.Predicates)
-
-		blobBuff = append(blobBuff, blobs...)
-	}
 	return blobBuff, nil
 }
 
@@ -163,70 +159,6 @@ func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, column
 
 func (sc *LocalStorageClient) GetTables() map[string]shared.TableEntry {
 	return sc.tables
-}
-
-func (sc *LocalStorageClient) collectBlobs(target string, columns []string, predicates []shared.Predicate) []shared.Blob {
-	filePath := sc.tables[target].Metadata["dir"]
-	contents, _ := sc.read(filePath)
-
-	blobs := []shared.Blob{}
-
-	for _, line := range strings.Split(string(contents), "\n") {
-		if line == "" {
-			continue
-		}
-		var blob shared.Blob
-		var endBlob shared.Blob = make(shared.Blob)
-		json.Unmarshal([]byte(line), &blob)
-		for _, field := range columns {
-			if field == "*" {
-				for field2 := range blob {
-					endBlob[field2] = blob[field2]
-				}
-				break
-			} else {
-				var value interface{}
-				getField(field, blob, &value)
-				endBlob[field] = value
-			}
-		}
-
-		blobs = append(blobs, endBlob)
-	}
-
-	if len(predicates) > 0 {
-		blobs = sc.applyPredicates(target, predicates, blobs)
-	}
-	return blobs
-}
-
-func (sc *LocalStorageClient) applyPredicates(target string, predicates []shared.Predicate, blobs []shared.Blob) []shared.Blob {
-	schema := sc.tables[target].EntrySchema
-	var keeps []bool = make([]bool, len(blobs))
-	for _, predicate := range predicates {
-		for ind, blob := range blobs {
-			keeps[ind] = check(predicate, blob, schema)
-		}
-	}
-
-	var newBlobs []shared.Blob
-
-	for ind := range blobs {
-		if keeps[ind] {
-			newBlobs = append(newBlobs, blobs[ind])
-		}
-	}
-
-	return newBlobs
-}
-
-func check(predicate shared.Predicate, blob shared.Blob, schema shared.Schema) bool {
-	var target, targetType interface{}
-	field, comparator, prTarget := predicate.GetFields()
-	getField(field, blob, &target)
-	getField(field, schema, &targetType)
-
-	return compare(target, prTarget, targetType, comparator)
 }
 
 func getField(field string, blob map[string]interface{}, target *interface{}) {

@@ -36,10 +36,6 @@ func InsertValues(target string, blobs []shared.Blob) error {
 	return storageClient.InsertValues(target, blobs)
 }
 
-func SelectValues(query shared.Query) ([]shared.Blob, error) {
-	return storageClient.SelectValues(query)
-}
-
 func ListTables() map[string]shared.TableEntry {
 	return storageClient.GetTables()
 }
