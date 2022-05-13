@@ -49,7 +49,11 @@ func checkForTasks(chId int) {
 		break
 	case shared.JdbCreate:
 		partCols, _ := inst.Tags["partition-columns"]
-		if err := database.CreateTable(inst.Targets[0], inst.Tags["schema"].(shared.Schema), partCols); err != nil {
+		schema, ok := inst.Tags["schema"].(shared.Schema)
+		if !ok {
+			schema = nil
+		}
+		if err := database.CreateTable(inst.Targets[0], schema, partCols); err != nil {
 			panic(err)
 		}
 		sendResponse(chId, "complete")
@@ -80,8 +84,24 @@ func buildAndConsume(inst shared.Instruction, chId int) {
 		predicate = nil
 	} else {
 		predicate = buildPredicate(inst.Targets[0], preProPredicate)
+		if predicate == nil {
+			shared.RespChannels[chId] <- string("WHERE clauses not allowed on schemaless tables")
+			return
+		}
 	}
-	consumer := database.NewConsumer(inst.Targets[0], predicate)
+
+	var columnSelector func(shared.Blob) shared.Blob
+	if columns, ok := inst.Tags["select-columns"].([]string); !ok {
+		columnSelector = nil
+	} else {
+		columnSelector = buildColumnSelector(inst.Targets[0], columns...)
+		for _, column := range columns {
+			if column == "*" {
+				columnSelector = nil
+			}
+		}
+	}
+	consumer := database.NewConsumer(inst.Targets[0], predicate, columnSelector)
 	consumer.ConsumeAll()
 
 	blobs := consumer.ReadAll()
@@ -94,9 +114,24 @@ func buildAndConsume(inst shared.Instruction, chId int) {
 	shared.RespChannels[chId] <- string(contents)
 }
 
+func buildColumnSelector(table string, columns ...string) func(shared.Blob) shared.Blob {
+	return func(blob shared.Blob) shared.Blob {
+		var newBlob shared.Blob = make(shared.Blob)
+
+		for _, column := range columns {
+			newBlob[column] = blob[column]
+		}
+
+		return newBlob
+	}
+}
+
 func buildPredicate(table string, predicate shared.PredicatePayload) func(shared.Blob) shared.Blob {
 	tables := database.ListTables()
 	schema := tables[table].EntrySchema
+	if schema == nil {
+		return nil
+	}
 
 	targetType := schema[predicate.Field]
 

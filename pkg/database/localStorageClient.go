@@ -99,17 +99,6 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 }
 
 func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) error {
-	tableEntry, ok := sc.tables[target]
-	if !ok {
-		return errors.New(fmt.Sprintf("table %s does not exist", target))
-	}
-
-	for _, blob := range blobs {
-		if !tableEntry.EntrySchema.Validate(blob) {
-			return errors.New(fmt.Sprintf("failed to validate schema for %v", blob))
-		}
-	}
-
 	contents, err := ioutil.ReadFile(ResolveFile(target))
 	split := strings.Split(string(contents), "\n")
 	for _, blob := range blobs {

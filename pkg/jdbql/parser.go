@@ -209,6 +209,10 @@ func optional(name string) {
 			break
 		}
 
+		tmpPtr++
+		if rawContents[tmpPtr] == ' ' {
+			tmpPtr++
+		}
 	}
 	addToTagBuffer(name, options)
 	truePtr = tmpPtr

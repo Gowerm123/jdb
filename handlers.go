@@ -29,7 +29,6 @@ func jdbHandler(rw http.ResponseWriter, req *http.Request) {
 	response := <-shared.RespChannels[chId]
 
 	rw.Write([]byte(response))
-	rw.WriteHeader(200)
 }
 
 func readRequestBody(req *http.Request) []byte {

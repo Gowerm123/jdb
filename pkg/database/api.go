@@ -30,7 +30,7 @@ func DropTable(tableName string) error {
 
 func InsertValues(target string, blobs []shared.Blob) error {
 	schema := storageClient.GetTables()[target].EntrySchema
-	if !schema.Validate(blobs...) {
+	if schema != nil && !schema.Validate(blobs...) {
 		return errors.New("failed to validate schema")
 	}
 	return storageClient.InsertValues(target, blobs)
