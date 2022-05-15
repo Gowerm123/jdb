@@ -24,6 +24,10 @@ const (
 	JdbList        = "LIST"
 	JdbGroup       = "GROUP"
 	JdbBy          = "BY"
+	JsonString     = "string"
+	JsonInt        = "int"
+	JsonFloat      = "float"
+	JsonBool       = "boolean"
 )
 
 func TruePath(path string) string {

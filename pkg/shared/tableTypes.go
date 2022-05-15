@@ -7,6 +7,8 @@ type TableEntry struct {
 	Metadata         map[string]string `json:"metadata"`
 }
 
+type Transform func(Blob) Blob
+
 type Query struct {
 	Targets     []string
 	Columns     []string

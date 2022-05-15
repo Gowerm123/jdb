@@ -16,15 +16,15 @@ type PredicatePayload struct {
 
 func Compare(value, predicateTarget, targetType interface{}, comparator string) bool {
 	switch targetType.(string) {
-	case "int":
+	case JsonInt:
 		val1, val2 := tryParseInt(value), tryParseInt(predicateTarget)
 		return compareInts(val1, val2, comparator)
-	case "bool":
-		val1, val2 := tryParseBool(value), tryParseBool(value)
+	case JsonBool:
+		val1, val2 := tryParseBool(value), tryParseBool(predicateTarget)
 		return compareBools(val1, val2, comparator)
-	case "string":
+	case JsonString:
 		return compareStrings(value.(string), predicateTarget.(string), comparator)
-	case "float":
+	case JsonFloat:
 		val1, val2 := tryParseFloat(value), tryParseFloat(predicateTarget)
 		return compareFloats(val1, val2, comparator)
 	case "char":

@@ -4,13 +4,6 @@ type Schema map[string]interface{}
 
 type Blob map[string]interface{}
 
-const (
-	jsonString = "string"
-	jsonInt    = "int"
-	jsonFloat  = "float"
-	jsonBool   = "boolean"
-)
-
 func (sch *Schema) Validate(blobs ...Blob) bool {
 	for _, blob := range blobs {
 		if !sch.validate(blob) {
@@ -46,17 +39,17 @@ func (sch *Schema) checkType(fieldName string, object, fieldType interface{}) bo
 	}
 
 	switch fieldType.(string) {
-	case jsonBool:
+	case JsonBool:
 		if _, ok := object.(bool); !ok {
 			return false
 		}
 		break
-	case jsonString:
+	case JsonString:
 		if _, ok := object.(string); !ok {
 			return false
 		}
 		break
-	case jsonInt:
+	case JsonInt:
 		if _, ok := object.(int); !ok {
 			//ints can deserialize as float64
 			if _, ok := object.(float64); !ok {
@@ -64,7 +57,7 @@ func (sch *Schema) checkType(fieldName string, object, fieldType interface{}) bo
 			}
 		}
 		break
-	case jsonFloat:
+	case JsonFloat:
 		if _, ok := object.(float64); !ok {
 			return false
 		}

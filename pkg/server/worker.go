@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/gowerm123/jdb/pkg/database"
 	"github.com/gowerm123/jdb/pkg/shared"
@@ -41,7 +42,6 @@ func listen(chId int) {
 
 func checkForTasks(chId int) {
 	var inst = <-shared.CmdChannels[chId]
-
 	shared.IdChannel <- chId
 	switch inst.Operation {
 	case shared.JdbSelect:
@@ -119,7 +119,19 @@ func buildColumnSelector(table string, columns ...string) func(shared.Blob) shar
 		var newBlob shared.Blob = make(shared.Blob)
 
 		for _, column := range columns {
-			newBlob[column] = blob[column]
+			columnVal := blob[column]
+			if len(strings.Split(column, ".")) > 1 {
+				rootObj := blob
+				subColumns := strings.Split(column, ".")
+				finalColumn := subColumns[len(subColumns)-1]
+				subColumns = subColumns[:len(subColumns)-1]
+				for _, sub := range subColumns {
+					rootObj = rootObj[sub].(map[string]interface{})
+				}
+
+				columnVal = rootObj[finalColumn]
+			}
+			newBlob[column] = columnVal
 		}
 
 		return newBlob

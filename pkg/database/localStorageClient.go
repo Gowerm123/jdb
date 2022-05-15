@@ -105,6 +105,7 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) e
 		blobStr, _ := json.Marshal(blob)
 		split = append(split, string(blobStr))
 	}
+
 	err = ioutil.WriteFile(ResolveFile(target), []byte(strings.Join(split, "\n")), 0644)
 
 	return err
