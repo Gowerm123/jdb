@@ -248,7 +248,7 @@ func schema() shared.Schema {
 	truePtr = tempPtr
 	var schema shared.Schema
 	if err := json.Unmarshal([]byte(subStr), &schema); err != nil {
-		panic(err)
+		panic(fmt.Errorf("faild to parse json structure - %s", err.Error()))
 	}
 
 	return schema

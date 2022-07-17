@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	roundRobinPtr = 0
-
 	quit chan bool
 )
 
@@ -46,9 +44,8 @@ func checkForTasks(chId int) {
 	switch inst.Operation {
 	case shared.JdbSelect:
 		buildAndConsume(inst, chId)
-		break
 	case shared.JdbCreate:
-		partCols, _ := inst.Tags["partition-columns"]
+		partCols := inst.Tags["partition-columns"]
 		schema, ok := inst.Tags["schema"].(shared.Schema)
 		if !ok {
 			schema = nil
@@ -57,15 +54,19 @@ func checkForTasks(chId int) {
 			panic(err)
 		}
 		sendResponse(chId, "complete")
-		break
 	case shared.JdbDrop:
-		database.DropTable(inst.Targets[0])
-		sendResponse(chId, "complete")
-		break
+		if err := database.DropTable(inst.Targets[0]); err != nil {
+			sendResponse(chId, err.Error())
+		} else {
+			sendResponse(chId, "complete")
+		}
 	case shared.JdbInsert:
-		database.InsertValues(inst.Targets[0], inst.Tags["values"].([]shared.Blob))
-		sendResponse(chId, "complete")
-		break
+		err := database.InsertValues(inst.Targets[0], inst.Tags["values"].([]shared.Blob))
+		if err != nil {
+			sendResponse(chId, err.Error())
+		} else {
+			sendResponse(chId, "complete")
+		}
 	case shared.JdbList:
 		tables := database.ListTables()
 		bytes, _ := json.MarshalIndent(tables, "", "  ")
@@ -119,23 +120,26 @@ func buildColumnSelector(table string, columns ...string) func(shared.Blob) shar
 		var newBlob shared.Blob = make(shared.Blob)
 
 		for _, column := range columns {
-			columnVal := blob[column]
-			if len(strings.Split(column, ".")) > 1 {
-				rootObj := blob
-				subColumns := strings.Split(column, ".")
-				finalColumn := subColumns[len(subColumns)-1]
-				subColumns = subColumns[:len(subColumns)-1]
-				for _, sub := range subColumns {
-					rootObj = rootObj[sub].(map[string]interface{})
-				}
-
-				columnVal = rootObj[finalColumn]
-			}
-			newBlob[column] = columnVal
+			newBlob[column] = handleSubFields(column, blob)
 		}
 
 		return newBlob
 	}
+}
+
+func handleSubFields(column string, blob map[string]interface{}) interface{} {
+	if len(strings.Split(column, ".")) > 1 {
+		rootObj := blob
+		subColumns := strings.Split(column, ".")
+		finalColumn := subColumns[len(subColumns)-1]
+		subColumns = subColumns[:len(subColumns)-1]
+		for _, sub := range subColumns {
+			rootObj = rootObj[sub].(map[string]interface{})
+		}
+
+		return rootObj[finalColumn]
+	}
+	return blob[column]
 }
 
 func buildPredicate(table string, predicate shared.PredicatePayload) func(shared.Blob) shared.Blob {
@@ -145,10 +149,10 @@ func buildPredicate(table string, predicate shared.PredicatePayload) func(shared
 		return nil
 	}
 
-	targetType := schema[predicate.Field]
+	targetType := handleSubFields(predicate.Field, schema)
 
 	return func(blob shared.Blob) shared.Blob {
-		if shared.Compare(blob[predicate.Field], predicate.Target, targetType, predicate.Comparator) {
+		if shared.Compare(handleSubFields(predicate.Field, blob), predicate.Target, targetType, predicate.Comparator) {
 			return blob
 		}
 		return nil

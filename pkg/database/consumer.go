@@ -39,7 +39,6 @@ func (cons *Consumer) ConsumeAll() []shared.Blob {
 
 		var blob shared.Blob
 		json.Unmarshal([]byte(line), &blob)
-
 		for _, udf := range cons.udfs {
 			if udf == nil {
 				continue

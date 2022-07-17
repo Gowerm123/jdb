@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,7 +18,7 @@ type LocalStorageClient struct {
 
 func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
 	for _, path := range paths {
-		err := os.WriteFile(path, contents, os.ModeAppend)
+		err := os.WriteFile(path, contents, 0777)
 		if err != nil {
 			return err
 		}
@@ -27,13 +26,9 @@ func (sc *LocalStorageClient) write(contents []byte, paths ...string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) read(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
-}
-
 func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
 	for _, path := range paths {
-		file, err := os.OpenFile(path, os.O_APPEND, 0644)
+		file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 		if err != nil {
 			return err
 		}
@@ -48,13 +43,13 @@ func (sc *LocalStorageClient) append(contents []byte, paths ...string) error {
 
 func (sc *LocalStorageClient) SaveTable(name string, schema shared.Schema, partitionColumns []string) error {
 	if _, ok := sc.tables[name]; ok {
-		return errors.New(fmt.Sprintf("table %s already exists", name))
+		return fmt.Errorf("table %s already exists", name)
 	}
 
 	alpha := fmt.Sprintf("%s/alpha", shared.TruePath(name))
 	beta := fmt.Sprintf("%s/beta", shared.TruePath(name))
 
-	os.MkdirAll(shared.TruePath(name), 0644)
+	os.MkdirAll(shared.TruePath(name), 0777)
 
 	if err := sc.write([]byte{}, alpha); err != nil {
 		return err
@@ -63,7 +58,6 @@ func (sc *LocalStorageClient) SaveTable(name string, schema shared.Schema, parti
 	if err := sc.write([]byte{}, beta); err != nil {
 		return err
 	}
-
 	sc.appendToTableList(name, schema, partitionColumns)
 	return nil
 }
@@ -87,10 +81,10 @@ func (sc *LocalStorageClient) LoadTables() {
 
 func (sc *LocalStorageClient) DropTable(tableName string) error {
 	if _, ok := sc.tables[tableName]; !ok {
-		return errors.New(fmt.Sprintf("table %s does not exist", tableName))
+		return fmt.Errorf("table %s does not exist", tableName)
 	}
 
-	if err := os.Remove(shared.TruePath(tableName)); err != nil {
+	if err := os.RemoveAll(shared.TruePath(tableName)); err != nil {
 		return err
 	}
 
@@ -98,16 +92,17 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) error {
-	contents, err := ioutil.ReadFile(ResolveFile(target))
-	split := strings.Split(string(contents), "\n")
+func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) (err error) {
 	for _, blob := range blobs {
-		blobStr, _ := json.Marshal(blob)
-		split = append(split, string(blobStr))
+		bytes, err := json.Marshal(blob)
+		if err != nil {
+			return fmt.Errorf("error during json marshalling - %s", err.Error())
+		}
+		err = sc.append(bytes, sc.ResolveFile(target))
+		if err != nil {
+			return fmt.Errorf("error during write to table file - %s", err.Error())
+		}
 	}
-
-	err = ioutil.WriteFile(ResolveFile(target), []byte(strings.Join(split, "\n")), 0644)
-
 	return err
 }
 
@@ -140,7 +135,7 @@ func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, column
 	var finalBlobs []shared.Blob
 	for _, blob := range r {
 		hash := sc.hash(blob, columns[0])
-		tempBucket, _ := buckets[hash]
+		tempBucket := buckets[hash]
 		finalBlobs = append(finalBlobs, tempBucket...)
 	}
 
@@ -167,7 +162,14 @@ func getField(field string, blob map[string]interface{}, target *interface{}) {
 func (sc *LocalStorageClient) appendToTableList(name string, schema shared.Schema, partitionColumns []string) {
 	metadata := make(map[string]string)
 	metadata["dir"] = shared.TruePath(name)
-	entry := shared.NewTableEntry(name, schema, partitionColumns, metadata)
+	entry := shared.TableEntry{
+		EntryName:        name,
+		EntrySchema:      schema,
+		PartitionColumns: partitionColumns,
+		Metadata:         metadata,
+		CurrentMajor:     "alpha",
+		CurrentMinor:     "beta",
+	}
 	sc.tables[name] = entry
 	sc.writeToTableListFile()
 }
@@ -186,7 +188,7 @@ func (sc *LocalStorageClient) writeToTableListFile() {
 		str, _ := json.Marshal(table)
 		contents += fmt.Sprintf("%s\n", str)
 	}
-	ioutil.WriteFile(tableListPath(), []byte(contents), 0644)
+	ioutil.WriteFile(tableListPath(), []byte(contents), 0777)
 }
 
 func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
@@ -201,7 +203,7 @@ func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
 }
 
 func (sc *LocalStorageClient) ResolveFile(table string) string {
-	return fmt.Sprintf("%s/alpha", shared.TruePath(table))
+	return fmt.Sprintf("%s/%s", shared.TruePath(table), sc.tables[table].CurrentMajor)
 }
 
 func tableListPath() string {

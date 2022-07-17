@@ -5,6 +5,8 @@ type TableEntry struct {
 	EntrySchema      Schema            `json:"schema"`
 	PartitionColumns []string          `json:"partitionColumns"`
 	Metadata         map[string]string `json:"metadata"`
+	CurrentMajor     string            `json:"currentMajor"`
+	CurrentMinor     string            `json:"currentMinor"`
 }
 
 type Transform func(Blob) Blob
