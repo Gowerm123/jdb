@@ -66,16 +66,6 @@ func (inst *Instruction) AddTag(tag Tag) {
 	inst.Tags[tag.Key] = tag.Value
 }
 
-func toBlobList(tables map[string]TableEntry) (blobs []Blob) {
-	for key := range tables {
-		if key == "" {
-			continue
-		}
-		blobs = append(blobs, Blob{"tableName": key})
-	}
-	return blobs
-}
-
 func forward(inst Instruction) (chId int) {
 	CmdChannels[roundRobinPtr] <- inst
 

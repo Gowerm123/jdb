@@ -43,12 +43,10 @@ func (sch *Schema) checkType(fieldName string, object, fieldType interface{}) bo
 		if _, ok := object.(bool); !ok {
 			return false
 		}
-		break
 	case JsonString:
 		if _, ok := object.(string); !ok {
 			return false
 		}
-		break
 	case JsonInt:
 		if _, ok := object.(int); !ok {
 			//ints can deserialize as float64
@@ -56,12 +54,10 @@ func (sch *Schema) checkType(fieldName string, object, fieldType interface{}) bo
 				return false
 			}
 		}
-		break
 	case JsonFloat:
 		if _, ok := object.(float64); !ok {
 			return false
 		}
-		break
 	}
 
 	return true

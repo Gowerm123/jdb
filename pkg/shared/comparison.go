@@ -5,10 +5,6 @@ import (
 	"strconv"
 )
 
-var (
-	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
-)
-
 type PredicatePayload struct {
 	Field, Comparator string
 	Target            interface{}
