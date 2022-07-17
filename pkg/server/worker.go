@@ -71,6 +71,11 @@ func checkForTasks(chId int) {
 		tables := database.ListTables()
 		bytes, _ := json.MarshalIndent(tables, "", "  ")
 		sendResponse(chId, string(bytes))
+	case shared.JdbDescribe:
+		tables := database.ListTables()
+		entry := tables[inst.Targets[0]]
+		bytes, _ := json.MarshalIndent(entry, "", "  ")
+		sendResponse(chId, string(bytes))
 	}
 
 }

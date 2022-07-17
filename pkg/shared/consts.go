@@ -24,6 +24,7 @@ const (
 	JdbList        = "LIST"
 	JdbGroup       = "GROUP"
 	JdbBy          = "BY"
+	JdbDescribe    = "DESCRIBE"
 	JsonString     = "string"
 	JsonInt        = "int"
 	JsonFloat      = "float"

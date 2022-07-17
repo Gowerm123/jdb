@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	words       []string
 	rawContents string
 	truePtr     int
 	iterPtr     int
@@ -35,8 +34,8 @@ var (
 		shared.JdbAs,
 		shared.JdbInto,
 		shared.JdbValues,
+		shared.JdbDescribe,
 	}
-	comparators []string = []string{">", "<", "=", "!=", "<=", ">="}
 )
 
 func AssignParserActives(req *http.Request, rw http.ResponseWriter) {
@@ -46,7 +45,6 @@ func AssignParserActives(req *http.Request, rw http.ResponseWriter) {
 
 func Parse(command string) {
 	reset()
-	words = strings.Split(command, " ")
 	rawContents = command
 	nextToken(false)
 	accept()
@@ -70,80 +68,69 @@ func accept() {
 		optional("select-columns")
 		nextToken(false)
 		expect(shared.JdbFrom)
-		break
 	case shared.JdbFrom:
 		optional("targets")
 		nextToken(false)
 		accept()
-		break
 	case shared.JdbCreate:
 		addToTokenBuffer(shared.JdbCreate)
 		nextToken(false)
 		expect(shared.JdbTable)
-		break
 	case shared.JdbTable:
 		nextToken(false)
 		ident()
 		accept()
-		break
 	case shared.JdbAs:
 		schema := schema()
 		nextToken(false)
 		tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
 		accept()
-		break
 	case shared.JdbDrop:
 		addToTokenBuffer(shared.JdbDrop)
 		nextToken(false)
 		expect(shared.JdbTable)
-		break
+	case shared.JdbDescribe:
+		addToTokenBuffer(shared.JdbDescribe)
+		nextToken(false)
+		ident()
+		accept()
 	case shared.JdbInsert:
 		addToTokenBuffer(shared.JdbInsert)
 		nextToken(false)
 		expect(shared.JdbInto)
-		break
 	case shared.JdbInto:
 		nextToken(false)
 		ident()
 		expect(shared.JdbValues)
-		break
 	case shared.JdbValues:
 		values := values()
 		tagBuffer = append(tagBuffer, shared.Tag{Key: "values", Value: values})
 		accept()
-		break
 	case shared.JdbWhere:
 		nextToken(false)
 		predicate()
-		break
 	case shared.JdbPartitioned:
 		nextToken(false)
 		expect(shared.JdbOn)
-		break
 	case shared.JdbOn:
 		switch prevToken {
 		case shared.JdbPartitioned:
 			optional("partition-columns")
 			accept()
-			break
 		}
 	case shared.JdbList:
 		addToTokenBuffer(shared.JdbList)
 		nextToken(false)
 		ident()
 		accept()
-		break
 	case shared.JdbGroup:
 		nextToken(false)
 		expect(shared.JdbBy)
-		break
 	case shared.JdbBy:
 		optional("group-by-columns")
 		accept()
-		break
 	default:
 		fatal("unexpected token", currToken)
-		break
 	}
 }
 
@@ -191,7 +178,7 @@ func reset() {
 func optional(name string) {
 	options := []string{}
 	tmpPtr := truePtr
-	for true {
+	for {
 		token := ""
 		for tmpPtr < len(rawContents) && rawContents[tmpPtr] != ',' && rawContents[tmpPtr] != ' ' {
 			token += string(rawContents[tmpPtr])
@@ -295,7 +282,7 @@ func assignment(name string) {
 	tmpPtr := truePtr
 	buff := ""
 	tempBuff := [][]string{}
-	for true {
+	for {
 		firstTerm, secondTerm := "", ""
 
 		for tmpPtr < len(rawContents) && (rawContents[tmpPtr] != ' ' || rawContents[tmpPtr] == '=') {
