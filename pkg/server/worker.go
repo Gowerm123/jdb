@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/gowerm123/jdb/pkg/database"
@@ -41,32 +42,33 @@ func listen(chId int) {
 func checkForTasks(chId int) {
 	var inst = <-shared.CmdChannels[chId]
 	shared.IdChannel <- chId
+	fmt.Println(inst)
 	switch inst.Operation {
 	case shared.JdbSelect:
 		buildAndConsume(inst, chId)
 	case shared.JdbCreate:
-		partCols := inst.Tags["partition-columns"]
-		schema, ok := inst.Tags["schema"].(shared.Schema)
-		if !ok {
-			schema = nil
-		}
-		if err := database.CreateTable(inst.Targets[0], schema, partCols); err != nil {
-			panic(err)
+		if val, ok := inst.Tags[shared.LOAD_TARGETS]; ok {
+			if err := database.CreateTableFromInputFile(inst.Targets[0], val.([]string)); err != nil {
+				panic(err)
+			}
+		} else {
+			partCols := inst.Tags[shared.PARTITION_COLUMNS]
+			schema, ok := inst.Tags["schema"].(shared.Schema)
+			if !ok {
+				schema = nil
+			}
+			if err := database.CreateTable(inst.Targets[0], schema, partCols); err != nil {
+				panic(err)
+			}
 		}
 		sendResponse(chId, "complete")
 	case shared.JdbDrop:
-		if err := database.DropTable(inst.Targets[0]); err != nil {
-			sendResponse(chId, err.Error())
-		} else {
-			sendResponse(chId, "complete")
-		}
+		database.DropTable(inst.Targets[0])
+		sendResponse(chId, "complete")
+
 	case shared.JdbInsert:
-		err := database.InsertValues(inst.Targets[0], inst.Tags["values"].([]shared.Blob))
-		if err != nil {
-			sendResponse(chId, err.Error())
-		} else {
-			sendResponse(chId, "complete")
-		}
+		database.InsertValues(inst.Targets[0], inst.Tags["values"].([]shared.Blob))
+		sendResponse(chId, "complete")
 	case shared.JdbList:
 		tables := database.ListTables()
 		bytes, _ := json.MarshalIndent(tables, "", "  ")
@@ -77,7 +79,6 @@ func checkForTasks(chId int) {
 		bytes, _ := json.MarshalIndent(entry, "", "  ")
 		sendResponse(chId, string(bytes))
 	}
-
 }
 
 func sendResponse(chId int, response string) {
@@ -97,7 +98,7 @@ func buildAndConsume(inst shared.Instruction, chId int) {
 	}
 
 	var columnSelector func(shared.Blob) shared.Blob
-	if columns, ok := inst.Tags["select-columns"].([]string); !ok {
+	if columns, ok := inst.Tags[shared.SELECT_COLUMNS].([]string); !ok {
 		columnSelector = nil
 	} else {
 		columnSelector = buildColumnSelector(inst.Targets[0], columns...)
@@ -154,10 +155,8 @@ func buildPredicate(table string, predicate shared.PredicatePayload) func(shared
 		return nil
 	}
 
-	targetType := handleSubFields(predicate.Field, schema)
-
 	return func(blob shared.Blob) shared.Blob {
-		if shared.Compare(handleSubFields(predicate.Field, blob), predicate.Target, targetType, predicate.Comparator) {
+		if shared.Compare(blob[predicate.Field], predicate.Target, predicate.Comparator) {
 			return blob
 		}
 		return nil

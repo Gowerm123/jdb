@@ -4,6 +4,7 @@ import "github.com/gowerm123/jdb/pkg/shared"
 
 type StorageClient interface {
 	SaveTable(string, shared.Schema, []string) error
+	SaveTableFromFile(string, []string, shared.Schema) error
 	LoadTables()
 	DropTable(string) error
 	InsertValues(string, []shared.Blob) error

@@ -24,11 +24,19 @@ const (
 	JdbList        = "LIST"
 	JdbGroup       = "GROUP"
 	JdbBy          = "BY"
+	JdbLoad        = "LOAD"
 	JdbDescribe    = "DESCRIBE"
 	JsonString     = "string"
 	JsonInt        = "int"
 	JsonFloat      = "float"
 	JsonBool       = "boolean"
+	JsonList       = "List"
+	JsonMap        = "Map"
+
+	GROUP_BY_COLUMNS  = "group-by-columns"
+	LOAD_TARGETS      = "load-targets"
+	PARTITION_COLUMNS = "partition-columns"
+	SELECT_COLUMNS    = "select-columns"
 )
 
 func TruePath(path string) string {

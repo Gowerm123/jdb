@@ -2,6 +2,7 @@ package shared
 
 type TableEntry struct {
 	EntryName        string            `json:"name"`
+	SourceFile       string            `json:"sourceFile"`
 	EntrySchema      Schema            `json:"schema"`
 	PartitionColumns []string          `json:"partitionColumns"`
 	Metadata         map[string]string `json:"metadata"`

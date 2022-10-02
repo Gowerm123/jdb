@@ -1,11 +1,8 @@
 package database
 
 import (
-	"crypto/sha1"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -62,8 +59,25 @@ func (sc *LocalStorageClient) SaveTable(name string, schema shared.Schema, parti
 	return nil
 }
 
+func (sc *LocalStorageClient) SaveTableFromFile(tableName string, loadTargets []string, schema shared.Schema) error {
+	if _, ok := sc.tables[tableName]; ok {
+		return fmt.Errorf("table %s already exists", tableName)
+	}
+
+	loadTarget := loadTargets[0]
+	alpha := fmt.Sprintf("%s/alpha", shared.TruePath(tableName))
+	beta := fmt.Sprintf("%s/beta", shared.TruePath(tableName))
+
+	os.MkdirAll(shared.TruePath(tableName), 0777)
+
+	os.Symlink(loadTarget, alpha)
+	os.Symlink(loadTarget, beta)
+
+	return sc.SaveTable(tableName, schema, nil)
+}
+
 func (sc *LocalStorageClient) LoadTables() {
-	contents, _ := ioutil.ReadFile(tableListPath())
+	contents, _ := os.ReadFile(tableListPath())
 	splitConts := strings.Split(string(contents), "\n")
 	endMap := make(map[string]shared.TableEntry)
 
@@ -92,7 +106,9 @@ func (sc *LocalStorageClient) DropTable(tableName string) error {
 	return nil
 }
 
-func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) (err error) {
+func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) error {
+	contents, _ := os.ReadFile(ResolveFile(target))
+	split := strings.Split(string(contents), "\n")
 	for _, blob := range blobs {
 		bytes, err := json.Marshal(blob)
 		if err != nil {
@@ -103,6 +119,9 @@ func (sc *LocalStorageClient) InsertValues(target string, blobs []shared.Blob) (
 			return fmt.Errorf("error during write to table file - %s", err.Error())
 		}
 	}
+
+	err := os.WriteFile(ResolveFile(target), []byte(strings.Join(split, "\n")), 0777)
+
 	return err
 }
 
@@ -111,7 +130,7 @@ func (sc *LocalStorageClient) SelectValues(query shared.Query) ([]shared.Blob, e
 	return blobBuff, nil
 }
 
-func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, columns []string) []shared.Blob {
+/*func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, columns []string) []shared.Blob {
 	buckets := make(map[string][]shared.Blob)
 	for _, blob := range l {
 		hash := sc.hash(blob, columns[0])
@@ -140,13 +159,13 @@ func (sc *LocalStorageClient) applyJoin(l []shared.Blob, r []shared.Blob, column
 	}
 
 	return finalBlobs
-}
+}*/
 
 func (sc *LocalStorageClient) GetTables() map[string]shared.TableEntry {
 	return sc.tables
 }
 
-func getField(field string, blob map[string]interface{}, target *interface{}) {
+/*func getField(field string, blob map[string]interface{}, target *interface{}) {
 	spl := strings.Split(field, ".")
 
 	var currMap map[string]interface{} = blob
@@ -157,7 +176,7 @@ func getField(field string, blob map[string]interface{}, target *interface{}) {
 			*target = currMap[field]
 		}
 	}
-}
+}*/
 
 func (sc *LocalStorageClient) appendToTableList(name string, schema shared.Schema, partitionColumns []string) {
 	metadata := make(map[string]string)
@@ -188,10 +207,10 @@ func (sc *LocalStorageClient) writeToTableListFile() {
 		str, _ := json.Marshal(table)
 		contents += fmt.Sprintf("%s\n", str)
 	}
-	ioutil.WriteFile(tableListPath(), []byte(contents), 0777)
+	os.WriteFile(tableListPath(), []byte(contents), 0777)
 }
 
-func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
+/*func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
 	var value interface{}
 	getField(column, input, &value)
 	str := fmt.Sprint(value)
@@ -200,10 +219,22 @@ func (sc *LocalStorageClient) hash(input shared.Blob, column string) string {
 	hasher.Write([]byte(str))
 
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-}
+}*/
 
 func (sc *LocalStorageClient) ResolveFile(table string) string {
-	return fmt.Sprintf("%s/%s", shared.TruePath(table), sc.tables[table].CurrentMajor)
+	alpha := fmt.Sprintf("%s/alpha", shared.TruePath(table))
+	if fileInfo, err := os.Lstat(alpha); err != nil {
+		panic(err)
+	} else {
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			linkPath, err := os.Readlink(alpha)
+			if err != nil {
+				panic(err)
+			}
+			return linkPath
+		}
+	}
+	return alpha
 }
 
 func tableListPath() string {

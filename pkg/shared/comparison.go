@@ -1,8 +1,12 @@
 package shared
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
-	"strconv"
+	"io/fs"
+	"os"
+	"reflect"
 )
 
 type PredicatePayload struct {
@@ -10,23 +14,68 @@ type PredicatePayload struct {
 	Target            interface{}
 }
 
-func Compare(value, predicateTarget, targetType interface{}, comparator string) bool {
-	switch targetType.(string) {
-	case JsonInt:
-		val1, val2 := tryParseInt(value), tryParseInt(predicateTarget)
-		return compareInts(val1, val2, comparator)
-	case JsonBool:
-		val1, val2 := tryParseBool(value), tryParseBool(predicateTarget)
-		return compareBools(val1, val2, comparator)
-	case JsonString:
-		return compareStrings(value.(string), predicateTarget.(string), comparator)
-	case JsonFloat:
-		val1, val2 := tryParseFloat(value), tryParseFloat(predicateTarget)
-		return compareFloats(val1, val2, comparator)
-	case "char":
-		return compareChars(value.(byte), predicateTarget.(byte), comparator)
+func InterrogateSchema(filename string) (Schema, error) {
+	file, err := os.OpenFile(filename, 0644, fs.FileMode(os.O_RDONLY))
+	if err != nil {
+		return nil, err
 	}
 
+	reader := bufio.NewReader(file)
+	var line []byte
+	for line, _, err = reader.ReadLine(); string(line) == "\n"; {
+		if err != nil {
+			return nil, err
+		}
+	}
+	var object map[string]interface{}
+	err = json.Unmarshal(line, &object)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range object {
+		object[k] = InterrogateType(v)
+	}
+
+	return object, nil
+}
+
+func InterrogateType(object interface{}) string {
+	switch object.(type) {
+	case int, uint, uint8, uint16, uint32, uint64, int32, int64:
+		return JsonInt
+	case float64, float32:
+		return JsonFloat
+	case string:
+		return JsonString
+	case bool:
+		return JsonBool
+	case []any:
+		return JsonList
+	case map[string]any:
+		return JsonMap
+	default:
+
+		panic(fmt.Sprintf("unknown type for object %v in is %s", object, fmt.Sprint(reflect.TypeOf(object))))
+	}
+}
+
+func Compare(value, predicateTarget interface{}, comparator string) bool {
+	valueType, targetType := InterrogateType(value), InterrogateType(predicateTarget)
+	if valueType != targetType {
+		panic("value type needs to be same as target type for comparison")
+	}
+
+	switch valueType {
+	case JsonBool:
+		return compareBools(value.(bool), predicateTarget.(bool), comparator)
+	case JsonFloat:
+		return compareFloats(value.(float64), predicateTarget.(float64), comparator)
+	case JsonInt:
+		return compareInts(value.(int), predicateTarget.(int), comparator)
+	case JsonString:
+		return compareStrings(value.(string), predicateTarget.(string), comparator)
+	}
 	return false
 }
 
@@ -110,32 +159,4 @@ func compareChars(value, otherValue byte, comparator string) bool {
 		return value >= otherValue
 	}
 	return false
-}
-
-func tryParseInt(value interface{}) int {
-	str := fmt.Sprint(value)
-
-	val, err := strconv.Atoi(str)
-	if err != nil {
-		panic(err)
-	}
-
-	return val
-}
-
-func tryParseFloat(value interface{}) float64 {
-	str := fmt.Sprint(value)
-
-	val, err := strconv.ParseFloat(str, 64)
-	if err != nil {
-		panic(err)
-	}
-
-	return val
-}
-
-func tryParseBool(value interface{}) bool {
-	str := fmt.Sprint(value)
-
-	return str == "true"
 }

@@ -1,6 +1,6 @@
 module github.com/gowerm123/jdb
 
-go 1.17
+go 1.19
 
 require github.com/go-zoo/bone v1.3.0
 

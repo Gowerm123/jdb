@@ -23,8 +23,8 @@ func NewConsumer(target string, udfs ...func(shared.Blob) shared.Blob) Consumer 
 
 func (cons *Consumer) ConsumeAll() []shared.Blob {
 	filePath := ResolveFile(cons.target)
-
 	file, err := os.Open(filePath)
+
 	if err != nil {
 		panic(err)
 	}
@@ -32,6 +32,7 @@ func (cons *Consumer) ConsumeAll() []shared.Blob {
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
+		println("scanning")
 		line := scanner.Text()
 		if line == "" {
 			continue

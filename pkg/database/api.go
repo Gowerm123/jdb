@@ -24,6 +24,17 @@ func CreateTable(tableName string, schema shared.Schema, partitionColumns interf
 	return storageClient.SaveTable(tableName, schema, partColumns)
 }
 
+func CreateTableFromInputFile(tableName string, loadTargets []string) error {
+	loadTarget := loadTargets[0]
+
+	schema, err := shared.InterrogateSchema(loadTarget)
+	if err != nil {
+		panic(err)
+	}
+
+	return storageClient.SaveTableFromFile(tableName, loadTargets, schema)
+}
+
 func DropTable(tableName string) error {
 	return storageClient.DropTable(tableName)
 }

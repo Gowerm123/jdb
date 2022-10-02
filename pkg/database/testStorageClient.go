@@ -48,6 +48,14 @@ func (sc *testStorageClient) SaveTable(name string, schema shared.Schema, partit
 	return nil
 }
 
+func (sc *testStorageClient) SaveTableFromFile(str string, strs []string, sch shared.Schema) error {
+	return nil
+}
+
+func (sc *testStorageClient) InterrogateSchema(str string) (shared.Schema, error) {
+	return nil, nil
+}
+
 func (sc *testStorageClient) SelectValues(query shared.Query) ([]shared.Blob, error) {
 	return sc.blobs[query.Targets[0]], nil
 }

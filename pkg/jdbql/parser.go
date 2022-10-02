@@ -65,7 +65,7 @@ func accept() {
 	switch currToken {
 	case shared.JdbSelect:
 		addToTokenBuffer(shared.JdbSelect)
-		optional("select-columns")
+		optional(shared.SELECT_COLUMNS)
 		nextToken(false)
 		expect(shared.JdbFrom)
 	case shared.JdbFrom:
@@ -81,10 +81,16 @@ func accept() {
 		ident()
 		accept()
 	case shared.JdbAs:
-		schema := schema()
-		nextToken(false)
-		tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
-		accept()
+		println(peekNext())
+		if peekNext() == shared.JdbLoad {
+			nextToken(false)
+			accept()
+		} else {
+			schema := schema()
+			nextToken(false)
+			tagBuffer = append(tagBuffer, shared.Tag{Key: "schema", Value: schema})
+			accept()
+		}
 	case shared.JdbDrop:
 		addToTokenBuffer(shared.JdbDrop)
 		nextToken(false)
@@ -115,7 +121,7 @@ func accept() {
 	case shared.JdbOn:
 		switch prevToken {
 		case shared.JdbPartitioned:
-			optional("partition-columns")
+			optional(shared.PARTITION_COLUMNS)
 			accept()
 		}
 	case shared.JdbList:
@@ -127,7 +133,11 @@ func accept() {
 		nextToken(false)
 		expect(shared.JdbBy)
 	case shared.JdbBy:
-		optional("group-by-columns")
+		optional(shared.GROUP_BY_COLUMNS)
+		accept()
+		break
+	case shared.JdbLoad:
+		optional(shared.LOAD_TARGETS)
 		accept()
 	default:
 		fatal("unexpected token", currToken)
@@ -163,6 +173,27 @@ func nextToken(isIdent bool) {
 		prevToken = currToken
 	}
 	currToken = buff
+}
+
+func peekNext() string {
+	buff, tmpPtr := "", truePtr
+	if tmpPtr >= len(rawContents) {
+		return ""
+	}
+	if rawContents[tmpPtr] == '\'' {
+		tmpPtr++
+		for tmpPtr < len(rawContents) && rawContents[tmpPtr] != '\'' {
+			buff += string(rawContents[tmpPtr])
+			tmpPtr++
+		}
+	} else {
+		for tmpPtr < len(rawContents) && (rawContents[tmpPtr] != ' ') {
+			buff += string(rawContents[tmpPtr])
+			tmpPtr++
+		}
+		tmpPtr++
+	}
+	return buff
 }
 
 func reset() {
