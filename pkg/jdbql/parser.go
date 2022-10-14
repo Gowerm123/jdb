@@ -399,7 +399,7 @@ func fatal(msgs ...string) {
 	panic(errors.New(str))
 }
 
-func contains(ls []string, tr string) bool {
+func contains[K string | byte](ls []K, tr K) bool {
 	for _, lsTr := range ls {
 		if tr == lsTr {
 			return true

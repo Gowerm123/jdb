@@ -23,12 +23,15 @@ func jdbHandler(rw http.ResponseWriter, req *http.Request) {
 	}()
 
 	body := readRequestBody(req)
-	jdbql.AssignParserActives(req, rw)
+	tokens := jdbql.Lex(body)
+	log.Println(tokens)
+	log.Println("HASODIAJSODA")
+	/*jdbql.AssignParserActives(req, rw)
 	jdbql.Parse(string(body))
 	chId := <-shared.IdChannel
 	response := <-shared.RespChannels[chId]
-
-	rw.Write([]byte(response))
+	*/
+	rw.Write([]byte{})
 }
 
 func readRequestBody(req *http.Request) []byte {
