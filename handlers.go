@@ -24,14 +24,16 @@ func jdbHandler(rw http.ResponseWriter, req *http.Request) {
 
 	body := readRequestBody(req)
 	tokens := jdbql.Lex(body)
-	log.Println(tokens)
-	log.Println("HASODIAJSODA")
+	buf := []byte{}
+	for _, token := range tokens {
+		buf = append(buf, []byte(fmt.Sprintf("Token {\n\tType: %v\n\tContents: %s\n}\n", token.TokenType, string(token.GetContents())))...)
+	}
 	/*jdbql.AssignParserActives(req, rw)
 	jdbql.Parse(string(body))
 	chId := <-shared.IdChannel
 	response := <-shared.RespChannels[chId]
 	*/
-	rw.Write([]byte{})
+	rw.Write(buf)
 }
 
 func readRequestBody(req *http.Request) []byte {

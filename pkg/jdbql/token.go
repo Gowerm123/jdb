@@ -19,3 +19,7 @@ type JdbToken struct {
 	contents []byte
 	TokenType
 }
+
+func (token JdbToken) GetContents() []byte {
+	return token.contents
+}
