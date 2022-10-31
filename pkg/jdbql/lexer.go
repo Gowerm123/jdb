@@ -16,7 +16,7 @@ const (
 	CHAR_WSP       = ' '
 )
 
-var reservedSyms = []byte{CHAR_SEMICOLON, CHAR_SQUOTE, CHAR_QUOTE, CHAR_PLUS, CHAR_MINUS, CHAR_NOT, CHAR_COMMA, CHAR_WSP, CHAR_EQUALS, CHAR_LPAREN, CHAR_RPAREN}
+var reservedSyms = []byte{CHAR_SEMICOLON, CHAR_SQUOTE, CHAR_QUOTE, CHAR_PLUS, CHAR_MINUS, CHAR_NOT, CHAR_COMMA, CHAR_WSP, CHAR_EQUALS, CHAR_LPAREN, CHAR_RPAREN, CHAR_LTHAN, CHAR_GTHAN}
 
 func Lex(content []byte) []JdbToken {
 	return lex(content)
@@ -70,7 +70,8 @@ func collectSym(ptr *int, content []byte) []byte {
 	case CHAR_NOT, CHAR_LTHAN, CHAR_GTHAN:
 		*ptr++
 		if content[*ptr] == CHAR_EQUALS {
-			return []byte{content[(*ptr - 1)], content[*ptr]}
+			*ptr++
+			return []byte{content[(*ptr - 2)], content[*ptr-1]}
 		} else {
 			return []byte{content[(*ptr - 1)]}
 		}
