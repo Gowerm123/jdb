@@ -39,6 +39,10 @@ const (
 	SELECT_COLUMNS    = "select-columns"
 )
 
+var (
+	Operations = []string{JdbSelect, JdbCreate, JdbDrop, JdbInsert, JdbList, JdbDescribe}
+)
+
 func TruePath(path string) string {
 	basePath := configs.GetConfig(configs.BaseDirectoryPath)
 	return fmt.Sprintf("%s/%s", basePath, path)
